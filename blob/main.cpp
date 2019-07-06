@@ -35,7 +35,7 @@ void alpha_edges(const Alpha_shape_2 &A, OutputIterator out) {
 template<class OutputIterator>
 bool tiff_input(OutputIterator out, const std::string& filename, double cutoff) {
     TIFF* tif = TIFFOpen(filename.c_str(), "r");
-    if (NULL == tif) {
+    if (nullptr == tif) {
         return false;
     }
     uint32 imageWidth=0;
@@ -59,8 +59,7 @@ bool tiff_input(OutputIterator out, const std::string& filename, double cutoff) 
             for (uint32 j=0; j<tileLength; j++) {
                 for (uint32 i=0; i<tileWidth; i++) {
                     if (buffer[j*tileWidth + i] > cutoff) {
-                        out << i + x;
-                        out << j + y;
+                        out << Point(i + x, j+y);
                     }
                 }
             }

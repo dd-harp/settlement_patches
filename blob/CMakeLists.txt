@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.13)  # Maybe 3.14 required?
 project(blob)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -28,8 +28,14 @@ if ( NOT Boost_FOUND )
 
 endif()
 
+find_library(
+        LIBTIFF
+        NAMES tiff
+        PATHS /usr/lib/x86_64-linux-gnu
+        )
+
 add_executable(blob main.cpp)
-add_to_cached_list( CGAL_EXECUTABLE_TARGETS blob )
+add_to_cached_list(CGAL_EXECUTABLE_TARGETS blob )
 
 # Link the executable to CGAL and third-party libraries
-target_link_libraries(blob   ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} libtiff )
+target_link_libraries(blob   ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} tiff )

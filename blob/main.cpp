@@ -85,8 +85,16 @@ bool EdgePoint(const ComplexElement& point, const Complex& complex) {
  * @param scan_length
  * @return
  */
+template<typename PointList>
 std::map<PixelKey,std::shared_ptr<std::vector<size_t>>>
-PixelSets(const Alpha_shape_2& complex, uint32 scan_length) {
+PixelSets(const PointList& points, double alpha, uint32 scan_length) {
+
+    Alpha_shape_2 complex(
+            points.begin(), points.end(),
+            FT(alpha),
+            Alpha_shape_2::GENERAL
+    );
+
     using RankMap = std::map<PixelKey, int>;
     using RankPMap = boost::associative_property_map<RankMap>;
     using ParentMap = std::map<PixelKey,PixelKey>;
@@ -216,11 +224,9 @@ int main() {
     tiff_input(std::back_inserter(points), tif, 1.0);
     TIFFClose(tif);
 
-    Alpha_shape_2 alpha_shape(
-            points.begin(), points.end(),
-            FT(10000),
-            Alpha_shape_2::GENERAL
-    );
-    auto pixel_sets = PixelSets(alpha_shape, scan_length);
+    double mosquito_meters = 200;
+    double pixel_side_meters = 30;
+    double alpha = std::pow(mosquito_meters / pixel_side_meters, 2);
+    auto pixel_sets = PixelSets(points, alpha, scan_length);
     return 0;
 }

@@ -17,6 +17,7 @@
 #include "read_tiff.h"
 #include "pixel.h"
 #include "connected_settlements.h"
+#include "simple_patches.h"
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 typedef Kernel::FT FT;
@@ -100,5 +101,7 @@ int main() {
     double alpha = std::pow(mosquito_meters / pixel_side_meters, 2);
     auto pixel_sets = PixelSets(points, alpha, scan_length);
     std::cout << "patches " << pixel_sets.size() << std::endl;
+
+    PolylineComponents(pixel_sets, alpha, scan_length);
     return 0;
 }

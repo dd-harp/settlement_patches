@@ -6,9 +6,8 @@
 #define BLOB_READ_TIFF_H
 
 #include <CGAL/Cartesian/Cartesian_base.h>
-typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-typedef Kernel::FT FT;
-typedef Kernel::Point_2 Point;
+
+namespace spacepop {
 
 template<typename TIFFTYPE>
 std::vector<uint32> ImageSizes(TIFFTYPE* tif) {
@@ -24,6 +23,7 @@ std::vector<uint32> ImageSizes(TIFFTYPE* tif) {
     return {imageWidth, imageLength, tileWidth, tileLength};
 }
 
+
 /*! Read populations from input.
  *
  * @tparam PointOutputIterator An output iterator over Point objects.
@@ -34,6 +34,8 @@ std::vector<uint32> ImageSizes(TIFFTYPE* tif) {
  */
 template<typename PointOutputIterator>
 void tiff_input(PointOutputIterator out, TIFF* tif, double cutoff, int corner=0) {
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
+
     auto sizes = ImageSizes(tif);
     auto xlim = sizes[0];
     auto ylim = sizes[1];
@@ -61,5 +63,5 @@ void tiff_input(PointOutputIterator out, TIFF* tif, double cutoff, int corner=0)
     }
     _TIFFfree(buffer);
 }
-
+}
 #endif //BLOB_READ_TIFF_H

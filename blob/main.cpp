@@ -32,6 +32,8 @@ typedef Alpha_shape_2::Alpha_shape_edges_iterator Alpha_shape_edges_iterator;
 typedef Alpha_shape_2::Alpha_shape_vertices_iterator Alpha_shape_vertices_iterator;
 typedef Alpha_shape_2::Vertex_handle Vertex_handle;
 
+using namespace spacepop;
+
 /* An Alpha_shape_2 is a Delaunay_triangulation_2 which is a Triangulation_2.
  * .classify(const Point&) returns the Classification_type.
  * Classification types are EXTERIOR (not in alpha-complex).
@@ -102,6 +104,7 @@ int main() {
     auto pixel_sets = PixelSets(points, alpha, scan_length);
     std::cout << "patches " << pixel_sets.size() << std::endl;
 
-    PolylineComponents(pixel_sets, alpha, scan_length);
+    double cost_distance = 1.0;
+    PolylineComponents(pixel_sets, alpha, cost_distance, scan_length);
     return 0;
 }

@@ -1,3 +1,16 @@
+#include <fstream>
+#include <filesystem>
+#include <iostream>
+#include <list>
+#include <algorithm>
+#include <vector>
+#include <map>
+#include <cmath>
+#include <cassert>
+#include <string.h>
+#include <boost/pending/disjoint_sets.hpp>
+#include <boost/property_map/property_map.hpp>
+
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Alpha_shape_2.h>
 #include <CGAL/Alpha_shape_vertex_base_2.h>
@@ -5,15 +18,9 @@
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/algorithm.h>
 #include <CGAL/assertions.h>
-#include <boost/pending/disjoint_sets.hpp>
-#include <boost/property_map/property_map.hpp>
-#include <fstream>
-#include <iostream>
-#include <list>
-#include <vector>
-#include <map>
-#include <cmath>
-#include "tiffio.h"
+#include "gdal/gdal.h"
+#include "geotiff/xtiffio.h"
+#include "geotiff/geotiffio.h"
 #include "read_tiff.h"
 #include "pixel.h"
 #include "connected_settlements.h"
@@ -33,6 +40,8 @@ typedef Alpha_shape_2::Alpha_shape_vertices_iterator Alpha_shape_vertices_iterat
 typedef Alpha_shape_2::Vertex_handle Vertex_handle;
 
 using namespace spacepop;
+using namespace std;
+namespace fs = std::filesystem;
 
 /* An Alpha_shape_2 is a Delaunay_triangulation_2 which is a Triangulation_2.
  * .classify(const Point&) returns the Classification_type.
@@ -81,20 +90,95 @@ bool file_input(OutputIterator out) {
 }
 
 
+void read_geotiff(const fs::path& geotiff_filename) {
+    GDALAllRegister();
+    for (int driver_idx=0; driver_idx < GDALGetDriverCount(); ++driver_idx) {
+        auto driver = GDALGetDriver(driver_idx);
+        cout << "driver " << driver_idx << " " << GDALGetDriverShortName(driver) << " "
+            << GDALGetDriverLongName(driver) << endl;
+    }
+    if (!GDALGetDriverByName("GTiff")) {
+        cout << "Cannot load GTiff driver" << endl;
+    }
+    auto parent_directory = geotiff_filename.parent_path();
+    auto file_stem = geotiff_filename.stem().string();
+    auto without_extension = parent_directory / file_stem;
+    cout << "Opening " << geotiff_filename << endl;
+    const char *allowed_drivers[3];
+    allowed_drivers[0] = "GTiff";
+    allowed_drivers[1] = "GeoTIFF";
+    allowed_drivers[2] = nullptr;
+
+    auto parent_iter = fs::directory_iterator(parent_directory);
+    file_stem.append(".");
+    cout << "stem is " << file_stem << endl;
+    auto compare_len = file_stem.size();
+    const auto sibling_cnt = count_if(begin(parent_iter), end(parent_iter), [&] (auto dirent) {
+        return dirent.path().filename().string().compare(0, compare_len, file_stem) == 0;
+    }) - 1;  // for the file itself.
+    cout << "sibling count " << sibling_cnt << endl;
+    char* siblings[sibling_cnt + 1];
+    size_t sibling_idx = 0;
+    for (auto& sibling : fs::directory_iterator(parent_directory)) {
+        bool matches = sibling.path().filename().string().compare(0, compare_len, file_stem) == 0;
+        bool same_file = sibling.path() == geotiff_filename;
+        if (matches && !same_file) {
+            auto name = sibling.path().string();
+            siblings[sibling_idx] = new char[name.size() + 1];
+            strcpy(siblings[sibling_idx++], &name[0]);
+            cout << "sibling " << name << endl;
+        }
+    }
+    assert(sibling_idx == sibling_cnt);
+    siblings[sibling_cnt] = nullptr;
+
+    GDALDatasetH dataset = GDALOpenEx(
+            geotiff_filename.c_str(),
+            GDAL_OF_RASTER | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
+            allowed_drivers,
+            NULL,
+            siblings
+            );
+
+    for (size_t sib_del=0; sib_del < sibling_cnt; ++sib_del) {
+        delete[] siblings[sib_del];
+    }
+
+    if (!dataset) {
+        cout << "GDAL could not open " << geotiff_filename << endl;
+        return;
+    }
+    GDALRasterBandH band = GDALGetRasterBand(dataset, 1);
+    const int xsize = GDALGetRasterXSize(dataset);
+    const int ysize = GDALGetRasterYSize(dataset);
+    cout << "GDAL says x,y (" << xsize << ", " << ysize << ")" << endl;
+    GDALClose(dataset);
+}
+
+
 // Reads a list of points and returns a list of segments
 // corresponding to the Alpha shape.
 int main() {
-    std::string filename{"hrsl_uga_pop.tif"};
+    fs::path filename{"/home/adolgert/dev/spacepop/data/hrsl_uga_pop.tif"};
+    if (!fs::exists(filename)) {
+        cout << "Could not find file " << filename << "." << endl;
+        return 3;
+    }
     int subset = 40;  // Use only a few tiles in the corner.
-
-    TIFF* tif = TIFFOpen(filename.c_str(), "r");
+    read_geotiff(filename);
+    TIFF* tif = XTIFFOpen(filename.c_str(), "r");
     if (nullptr == tif) {
         return 7;
     }
+
+    GTIF *gtif = GTIFNew(tif);
+
     // The width of a line.
     auto scan_length = ImageSizes(tif)[0];
     std::vector<Point> points;
     tiff_input(std::back_inserter(points), tif, 0.1, subset);
+
+    GTIFFree(gtif);
     TIFFClose(tif);
     std::cout << "settlements " << points.size() << std::endl;
 

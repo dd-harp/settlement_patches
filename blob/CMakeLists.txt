@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)  # Maybe 3.14 required?
 project(blob)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )
@@ -38,4 +38,4 @@ add_executable(blob main.cpp read_tiff.h connected_settlements.h pixel.h simple_
 add_to_cached_list(CGAL_EXECUTABLE_TARGETS blob )
 
 # Link the executable to CGAL and third-party libraries
-target_link_libraries(blob   ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} tiff )
+target_link_libraries(blob   ${CGAL_LIBRARIES} ${CGAL_3RD_PARTY_LIBRARIES} geotiff tiff gdal stdc++fs)

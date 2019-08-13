@@ -90,16 +90,19 @@ bool file_input(OutputIterator out) {
 }
 
 
-void read_geotiff(const fs::path& geotiff_filename) {
-    GDALAllRegister();
+void print_gdal_drivers() {
     for (int driver_idx=0; driver_idx < GDALGetDriverCount(); ++driver_idx) {
         auto driver = GDALGetDriver(driver_idx);
         cout << "driver " << driver_idx << " " << GDALGetDriverShortName(driver) << " "
-            << GDALGetDriverLongName(driver) << endl;
+             << GDALGetDriverLongName(driver) << endl;
     }
     if (!GDALGetDriverByName("GTiff")) {
         cout << "Cannot load GTiff driver" << endl;
     }
+}
+
+
+void read_geotiff(const fs::path& geotiff_filename) {
     auto parent_directory = geotiff_filename.parent_path();
     auto file_stem = geotiff_filename.stem().string();
     auto without_extension = parent_directory / file_stem;
@@ -164,6 +167,8 @@ int main() {
         cout << "Could not find file " << filename << "." << endl;
         return 3;
     }
+    GDALAllRegister();
+
     int subset = 40;  // Use only a few tiles in the corner.
     read_geotiff(filename);
     TIFF* tif = XTIFFOpen(filename.c_str(), "r");

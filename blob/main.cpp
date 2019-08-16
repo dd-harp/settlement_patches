@@ -7,6 +7,7 @@
 #include <map>
 #include <cmath>
 #include <cassert>
+#include <array>
 #include <string.h>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/property_map/property_map.hpp>
@@ -18,7 +19,8 @@
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/algorithm.h>
 #include <CGAL/assertions.h>
-#include "gdal/gdal.h"
+#include "gdal/gdal_priv.h"
+#include "gdal/cpl_conv.h"
 #include "geotiff/xtiffio.h"
 #include "geotiff/geotiffio.h"
 #include "read_tiff.h"
@@ -135,13 +137,13 @@ void read_geotiff(const fs::path& geotiff_filename) {
     assert(sibling_idx == sibling_cnt);
     siblings[sibling_cnt] = nullptr;
 
-    GDALDatasetH dataset = GDALOpenEx(
+    auto dataset = static_cast<GDALDataset*>(GDALOpenEx(
             geotiff_filename.c_str(),
             GDAL_OF_RASTER | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
             allowed_drivers,
-            NULL,
+            nullptr,
             siblings
-            );
+            ));
 
     for (size_t sib_del=0; sib_del < sibling_cnt; ++sib_del) {
         delete[] siblings[sib_del];
@@ -151,10 +153,35 @@ void read_geotiff(const fs::path& geotiff_filename) {
         cout << "GDAL could not open " << geotiff_filename << endl;
         return;
     }
-    GDALRasterBandH band = GDALGetRasterBand(dataset, 1);
-    const int xsize = GDALGetRasterXSize(dataset);
-    const int ysize = GDALGetRasterYSize(dataset);
+
+    const char* projection = dataset->GetProjectionRef();
+    cout << "projection: " << projection << endl;
+
+    const int xsize = dataset->GetRasterXSize();
+    const int ysize = dataset->GetRasterYSize();
     cout << "GDAL says x,y (" << xsize << ", " << ysize << ")" << endl;
+
+    vector<double> geoTransform(6);
+    if (dataset->GetGeoTransform(&geoTransform[0]) == CE_None) {
+        cout << "GeoTransform top left x " << geoTransform[0] << endl;
+        cout << "GeoTransform west-east pixel resolution " << geoTransform[1] << endl;
+        cout << "GeoTransform top left y " << geoTransform[3] << endl;
+        cout << "GeoTransform north-south pixel resolution  " << geoTransform[5] << endl;
+    }
+
+    cout << dataset->GetRasterCount() << " raster bands" << endl;
+    GDALRasterBand* band = dataset->GetRasterBand(1);
+    array<int,2> block_size;
+    band->GetBlockSize(&block_size[0], &block_size[1]);
+    cout << "block size (" << block_size[0] << ", " << block_size[1] << ")" << endl;
+    cout << "raster type " << GDALGetDataTypeName(band->GetRasterDataType()) << endl;
+
+    array<int,2> block_cnt = {
+            (band->GetXSize() + block_size[0] - 1) / block_size[0],
+            (band->GetYSize() + block_size[1] - 1) / block_size[1],
+    };
+    cout << "block count (" << block_cnt[0] << ", " << block_cnt[1] << ")" << endl;
+
     GDALClose(dataset);
 }
 

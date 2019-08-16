@@ -11,6 +11,7 @@
 #include <string.h>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/property_map/property_map.hpp>
+#include <boost/program_options.hpp>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Alpha_shape_2.h>
@@ -24,6 +25,7 @@
 #include "geotiff/xtiffio.h"
 #include "geotiff/geotiffio.h"
 #include "read_tiff.h"
+#include "gdal_raster.h"
 #include "pixel.h"
 #include "connected_settlements.h"
 #include "simple_patches.h"
@@ -44,6 +46,7 @@ typedef Alpha_shape_2::Vertex_handle Vertex_handle;
 using namespace spacepop;
 using namespace std;
 namespace fs = std::filesystem;
+namespace po = boost::program_options;
 
 /* An Alpha_shape_2 is a Delaunay_triangulation_2 which is a Triangulation_2.
  * .classify(const Point&) returns the Classification_type.
@@ -186,10 +189,35 @@ void read_geotiff(const fs::path& geotiff_filename) {
 }
 
 
+po::options_description parser()
+{
+    po::options_description options("blob create");
+    options.add_options()
+            ("help", "write help message")
+            ("settlement", po::value<fs::path>(), "settlement layer GeoTIFF")
+            ;
+    return options;
+}
+
+
 // Reads a list of points and returns a list of segments
 // corresponding to the Alpha shape.
-int main() {
+int main(int argc, char* argv[]) {
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, parser()), vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        cout << parser() << endl;
+        return 0;
+    }
     fs::path filename{"/home/adolgert/dev/spacepop/data/hrsl_uga_pop.tif"};
+    if (vm.count("settlement")) {
+        filename = vm["settlement"].as<fs::path>();
+    } else {
+        cout << "Using default file " << filename << endl;
+    }
+
     if (!fs::exists(filename)) {
         cout << "Could not find file " << filename << "." << endl;
         return 3;
@@ -197,21 +225,14 @@ int main() {
     GDALAllRegister();
 
     int subset = 40;  // Use only a few tiles in the corner.
-    read_geotiff(filename);
-    TIFF* tif = XTIFFOpen(filename.c_str(), "r");
-    if (nullptr == tif) {
-        return 7;
-    }
-
-    GTIF *gtif = GTIFNew(tif);
+    auto dataset = OpenGeoTiff(filename);
+    GDALRasterBand* band = dataset->GetRasterBand(1);
+    std::vector<Point> points;
+    gdal_raster_points(std::back_inserter(points), band, 0.1, subset);
 
     // The width of a line.
-    auto scan_length = ImageSizes(tif)[0];
-    std::vector<Point> points;
-    tiff_input(std::back_inserter(points), tif, 0.1, subset);
+    auto scan_length = dataset->GetRasterXSize();
 
-    GTIFFree(gtif);
-    TIFFClose(tif);
     std::cout << "settlements " << points.size() << std::endl;
 
     double mosquito_meters = 200;

@@ -47,10 +47,8 @@ namespace spacepop {
 
         std::vector<Point> pixel_bounds;
         for (auto &pixel: pixels) {
-            auto pt = PixelToPoint(pixel, scan_length);
+            auto [x, y] = PixelToPoint(pixel, scan_length);
             // It's a uint32 coming in. We need to use real coordinates near this line.
-            double x = std::get<0>(pt);
-            double y = std::get<1>(pt);
             pixel_bounds.emplace_back(Point(x, y));
             pixel_bounds.emplace_back(Point(x + 1, y));
             pixel_bounds.emplace_back(Point(x, y + 1));
@@ -62,7 +60,15 @@ namespace spacepop {
                 PolygonKernel::FT(alpha),
                 Alpha_shape_2::GENERAL
         );
+        std::cout << "solid components " << complex.number_of_solid_components(alpha) << std::endl;
+        std::cout << complex << std::endl;
         Polygon_2 polygon;
+        // value of this iterator is Dt::vertex_handle;
+        auto vertex = complex.alpha_shape_vertices_begin();
+        auto vertex_end = complex.alpha_shape_vertices_end();
+        for (; vertex != vertex_end; ++vertex) {
+            ; // polygon.insert(polygon.vertices_end(), vertex->Point());
+        }
         return polygon;
     }
 

@@ -14,14 +14,12 @@ typedef size_t PixelKey;
 //! Convert an (x, y) into a single integer.
 template<typename Point>
 PixelKey PointToPixel(const Point& p, uint32 scan_length) {
-    auto x = p.x();
-    auto y = p.y();
-    return std::lround(y) * scan_length + std::lround(x);
+    return std::lround(p.y()) * scan_length + std::lround(p.x());
 }
 
 
 template<typename PIXELKEY>
-std::tuple<uint32,uint32> PixelToPoint(PIXELKEY pixel, uint32 scan_length) {
+std::array<uint32,2> PixelToPoint(PIXELKEY pixel, uint32 scan_length) {
     uint32 x = pixel % scan_length;
     uint32 y = pixel / scan_length;
     return {x, y};

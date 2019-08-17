@@ -84,7 +84,7 @@ target_link_libraries(
 )
 
 
-add_executable(blob_test test_main.cpp simple_patches_test.cpp)
+add_executable(blob_test test_main.cpp simple_patches_test.cpp simple_patches.h)
 target_link_libraries(
         blob_test
         ${CGAL_LIBRARIES}

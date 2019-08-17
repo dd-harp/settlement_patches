@@ -15,6 +15,7 @@
 #include "gdal_raster.h"
 #include "connected_settlements.h"
 #include "simple_patches.h"
+#include "gtest/gtest.h"
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 typedef Kernel::Point_2 Point;
@@ -45,6 +46,7 @@ po::options_description parser()
     po::options_description options("blob create");
     options.add_options()
             ("help", "write help message")
+            ("test", "run all tests")
             ("settlement", po::value<fs::path>(), "settlement layer GeoTIFF")
             ("tile-subset", po::value<int>(), "how many tiles to use")
             ("population-cutoff", po::value<double>(), "minimum people per pixel")
@@ -77,6 +79,10 @@ int main(int argc, char* argv[]) {
     double population_cutoff = 0.1;
     if (vm.count("population-cutoff")) {
         population_cutoff = vm["population-cutoff"].as<double>();
+    }
+    if (vm.count("test")) {
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
     }
 
     if (!fs::exists(filename)) {

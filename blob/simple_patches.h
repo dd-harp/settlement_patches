@@ -29,6 +29,42 @@
 #include "pixel.h"
 
 namespace spacepop {
+    typedef CGAL::Exact_predicates_inexact_constructions_kernel PolygonKernel;
+    typedef CGAL::Polygon_2<PolygonKernel> Polygon_2;
+
+    template<typename PIXELS>
+    Polygon_2 pixels_to_polygon(PIXELS pixels, int scan_length, double alpha) {
+        typedef PolygonKernel::Point_2 Point;
+        // Set up the alpha shapes
+        typedef CGAL::Alpha_shape_vertex_base_2<PolygonKernel> Vb;
+        typedef CGAL::Alpha_shape_face_base_2<PolygonKernel> Fb;
+        typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
+        typedef CGAL::Delaunay_triangulation_2<PolygonKernel, Tds> Triangulation_2;
+        typedef CGAL::Alpha_shape_2<Triangulation_2> Alpha_shape_2;
+        typedef Alpha_shape_2::Alpha_shape_edges_iterator Alpha_shape_edges_iterator;
+        typedef Alpha_shape_2::Alpha_shape_vertices_iterator Alpha_shape_vertices_iterator;
+        typedef Alpha_shape_2::Vertex_handle Vertex_handle;
+
+        std::vector<Point> pixel_bounds;
+        for (auto &pixel: pixels) {
+            auto pt = PixelToPoint(pixel, scan_length);
+            // It's a uint32 coming in. We need to use real coordinates near this line.
+            double x = std::get<0>(pt);
+            double y = std::get<1>(pt);
+            pixel_bounds.emplace_back(Point(x, y));
+            pixel_bounds.emplace_back(Point(x + 1, y));
+            pixel_bounds.emplace_back(Point(x, y + 1));
+            pixel_bounds.emplace_back(Point(x + 1, y + 1));
+        }
+        // Make an alpha-shape that's all of those pixel corners.
+        Alpha_shape_2 complex(
+                pixel_bounds.begin(), pixel_bounds.end(),
+                PolygonKernel::FT(alpha),
+                Alpha_shape_2::GENERAL
+        );
+        Polygon_2 polygon;
+        return polygon;
+    }
 
     template<typename PIXELSETMAP>
     void PolylineComponents(PIXELSETMAP pixel_set, double alpha, double cost_distance, uint32 scan_length) {
@@ -39,17 +75,6 @@ namespace spacepop {
         typedef Kernel::FT FT;
         typedef Kernel::Point_2 Point;
         typedef Kernel::Segment_2 Segment;
-
-        // Set up the alpha shapes
-        typedef CGAL::Polygon_2<Kernel> Polygon_2;
-        typedef CGAL::Alpha_shape_vertex_base_2<Kernel> Vb;
-        typedef CGAL::Alpha_shape_face_base_2<Kernel> Fb;
-        typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
-        typedef CGAL::Delaunay_triangulation_2<Kernel, Tds> Triangulation_2;
-        typedef CGAL::Alpha_shape_2<Triangulation_2> Alpha_shape_2;
-        typedef Alpha_shape_2::Alpha_shape_edges_iterator Alpha_shape_edges_iterator;
-        typedef Alpha_shape_2::Alpha_shape_vertices_iterator Alpha_shape_vertices_iterator;
-        typedef Alpha_shape_2::Vertex_handle Vertex_handle;
 
         // Set up the polyline simplification.
         typedef PS::Vertex_base_2<Kernel> PSVb;
@@ -64,34 +89,17 @@ namespace spacepop {
 
         for (auto &pixel_iter: pixel_set) {
             // Create a list that has every corner of every pixel in a pixel set.
-            std::vector<Point> pixel_bounds;
-            for (auto &pixel: *pixel_iter.second) {
-                auto pt = PixelToPoint(pixel, scan_length);
-                // It's a uint32 coming in. We need to use real coordinates near this line.
-                double x = std::get<0>(pt);
-                double y = std::get<1>(pt);
-                pixel_bounds.emplace_back(Point(x, y));
-                pixel_bounds.emplace_back(Point(x + 1, y));
-                pixel_bounds.emplace_back(Point(x, y + 1));
-                pixel_bounds.emplace_back(Point(x + 1, y + 1));
-            }
-            // Make an alpha-shape that's all of those pixel corners.
-            Alpha_shape_2 complex(
-                    pixel_bounds.begin(), pixel_bounds.end(),
-                    FT(alpha),
-                    Alpha_shape_2::GENERAL
-            );
 
-            auto vertex = *complex.alpha_shape_vertices_begin();
-            auto point = vertex->point();
+//            auto vertex = *complex.alpha_shape_vertices_begin();
+//            auto point = vertex->point();
 
             // Put the alpha-complex of that shape into the list of shapes.
-            auto edge_iter = complex.alpha_shape_edges_begin();
-            auto edge_end = complex.alpha_shape_edges_end();
-            for (; edge_iter != edge_end; ++edge_iter) {
-                auto segment = complex.segment(*edge_iter);
-                constrained_triangulation.insert_constraint(segment.source(), segment.target());
-            }
+//            auto edge_iter = complex.alpha_shape_edges_begin();
+//            auto edge_end = complex.alpha_shape_edges_end();
+//            for (; edge_iter != edge_end; ++edge_iter) {
+//                auto segment = complex.segment(*edge_iter);
+//                constrained_triangulation.insert_constraint(segment.source(), segment.target());
+//            }
         }
         std::cout << "smoothing" << std::endl;
         PS::simplify(constrained_triangulation, Cost(), Stop(std::pow(cost_distance, 2)));

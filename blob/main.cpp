@@ -46,6 +46,8 @@ po::options_description parser()
     options.add_options()
             ("help", "write help message")
             ("settlement", po::value<fs::path>(), "settlement layer GeoTIFF")
+            ("tile-subset", po::value<int>(), "how many tiles to use")
+            ("population-cutoff", po::value<double>(), "minimum people per pixel")
             ;
     return options;
 }
@@ -68,18 +70,26 @@ int main(int argc, char* argv[]) {
     } else {
         cout << "Using default file " << filename << endl;
     }
+    int use_subset_of_tiles = 0;  // Use only a few tiles in the corner.
+    if (vm.count("tile-subset")) {
+        use_subset_of_tiles = vm["tile-subset"].as<int>();
+    }
+    double population_cutoff = 0.1;
+    if (vm.count("population-cutoff")) {
+        population_cutoff = vm["population-cutoff"].as<double>();
+    }
 
     if (!fs::exists(filename)) {
         cout << "Could not find file " << filename << "." << endl;
         return 3;
     }
+    // This initializes GDAL's list of drivers to read and write files.
     GDALAllRegister();
 
-    int subset = 40;  // Use only a few tiles in the corner.
     auto dataset = OpenGeoTiff(filename);
     GDALRasterBand* band = dataset->GetRasterBand(1);
     std::vector<Point> points;
-    gdal_raster_points(std::back_inserter(points), band, 0.1, subset);
+    gdal_raster_points(std::back_inserter(points), band, population_cutoff, use_subset_of_tiles);
 
     // The width of a line.
     auto scan_length = dataset->GetRasterXSize();

@@ -23,11 +23,12 @@ namespace spacepop {
         if (ds == nullptr) {
             throw std::runtime_error("Could not create dataset");
         }
-        OGRLayer* layer = ds->CreateLayer("patch", nullptr, wkbPoint, NULL);
+        OGRLayer* layer = ds->CreateLayer("patch", nullptr, wkbPoint, nullptr);
         if (layer == nullptr) {
             throw std::runtime_error("Could not create layer.");
         }
 
     }
 }
+
 #endif //BLOB_GDAL_VECTOR_H

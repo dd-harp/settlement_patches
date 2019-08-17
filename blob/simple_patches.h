@@ -70,10 +70,10 @@ namespace spacepop {
                 // It's a uint32 coming in. We need to use real coordinates near this line.
                 double x = std::get<0>(pt);
                 double y = std::get<1>(pt);
-                pixel_bounds.push_back(Point(x, y));
-                pixel_bounds.push_back(Point(x + 1, y));
-                pixel_bounds.push_back(Point(x, y + 1));
-                pixel_bounds.push_back(Point(x + 1, y + 1));
+                pixel_bounds.emplace_back(Point(x, y));
+                pixel_bounds.emplace_back(Point(x + 1, y));
+                pixel_bounds.emplace_back(Point(x, y + 1));
+                pixel_bounds.emplace_back(Point(x + 1, y + 1));
             }
             // Make an alpha-shape that's all of those pixel corners.
             Alpha_shape_2 complex(
@@ -83,6 +83,7 @@ namespace spacepop {
             );
 
             auto vertex = *complex.alpha_shape_vertices_begin();
+            auto point = vertex->point();
 
             // Put the alpha-complex of that shape into the list of shapes.
             auto edge_iter = complex.alpha_shape_edges_begin();

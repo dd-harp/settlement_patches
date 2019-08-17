@@ -34,7 +34,7 @@ find_library(
         PATHS /usr/lib/x86_64-linux-gnu
         )
 
-add_executable(blob main.cpp read_tiff.h connected_settlements.h pixel.h simple_patches.h shapefile.h gdal_raster.h gdal_raster.cpp)
+add_executable(blob main.cpp read_tiff.h connected_settlements.h pixel.h simple_patches.h shapefile.h gdal_raster.h gdal_raster.cpp gdal_vector.h)
 add_to_cached_list(CGAL_EXECUTABLE_TARGETS blob )
 
 # Link the executable to CGAL and third-party libraries

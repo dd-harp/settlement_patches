@@ -60,8 +60,8 @@ namespace spacepop {
                 PolygonKernel::FT(alpha),
                 Alpha_shape_2::GENERAL
         );
-        std::cout << "solid components " << complex.number_of_solid_components(alpha) << std::endl;
-        std::cout << complex << std::endl;
+//        std::cout << "solid components " << complex.number_of_solid_components(alpha) << std::endl;
+//        std::cout << complex << std::endl;
         Polygon_2 polygon;
         // value of this iterator is Dt::vertex_handle;
         auto vertex = complex.alpha_shape_vertices_begin();

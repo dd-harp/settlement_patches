@@ -83,8 +83,8 @@ target_link_libraries(
         gtest_main
 )
 
-
-add_executable(blob_test test_main.cpp simple_patches_test.cpp simple_patches.h)
+# Make a second executable that runs the tests.
+add_executable(blob_test test_main.cpp cgal_tutorial.cpp simple_patches_test.cpp simple_patches.h)
 target_link_libraries(
         blob_test
         ${CGAL_LIBRARIES}

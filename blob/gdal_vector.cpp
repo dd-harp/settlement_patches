@@ -33,6 +33,7 @@ void OpenShapefile(const std::filesystem::path &shapefile_path)
                 } else {
                     comma = true;
                 }
+                cout << oField.GetName() << "=";
                 switch (oField.GetType()) {
                     case OFTInteger:
                         cout << oField.GetInteger();
@@ -52,6 +53,24 @@ void OpenShapefile(const std::filesystem::path &shapefile_path)
                 }
             }
             cout << endl;
+        }
+
+        for (auto& geom_feature: layer) {
+            auto geometry = geom_feature->GetGeometryRef();
+            if (geometry != nullptr) {
+                cout << "geometry " << geometry->getGeometryName() << " " << geometry->getGeometryType() << endl;
+                if (geometry->getGeometryType() == wkbLineString) {
+                    auto line_string = dynamic_cast<OGRLineString*>(geometry);
+                    std::cout << "is closed: " << line_string->get_IsClosed() << endl;
+                    for (auto& point: line_string) {
+                        std::cout << "(" << point.getX() << "," << point.getY() << ") ";
+                    }
+                } else {
+                    cout << "unknown geometry type" << endl;
+                }
+            } else {
+                cout << "No geometry for feature" << endl;
+            }
         }
     }
 }

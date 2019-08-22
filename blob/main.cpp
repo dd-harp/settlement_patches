@@ -41,37 +41,56 @@ namespace po = boost::program_options;
  */
 
 
-po::options_description parser()
+po::options_description parser(const map<string,fs::path>& path_argument)
 {
     po::options_description options("blob create");
     options.add_options()
             ("help", "write help message")
             ("test", "run all tests")
-            ("settlement", po::value<fs::path>(), "settlement layer GeoTIFF")
             ("tile-subset", po::value<int>(), "how many tiles to use")
             ("population-cutoff", po::value<double>(), "minimum people per pixel")
             ;
+    for (auto const& [name, default_path] : path_argument) {
+        options.add_options()(name.c_str(), po::value<fs::path>(), name.c_str());
+    }
     return options;
+}
+
+
+bool read_paths_from_command_line_args(po::variables_map& vm, map<string,fs::path>& input_path) {
+    for (auto path_iter=input_path.begin(); path_iter != input_path.end(); ++path_iter) {
+        if (vm.count(path_iter->first)) {
+            path_iter->second = vm[path_iter->first].as<fs::path>();
+        }
+        if (!fs::exists(path_iter->second)) {
+            cout << "path for " << path_iter->first << " not found: " << path_iter->second << endl;
+            return false;
+        }
+    }
+    return true;
 }
 
 
 // Reads a list of points and returns a list of segments
 // corresponding to the Alpha shape.
 int main(int argc, char* argv[]) {
+    map<string,fs::path> input_path = {
+            {"settlement", "/home/adolgert/dev/spacepop/data/hrsl/hrsl_uga_pop.tif"},
+            {"pfpr", "/home/adolgert/dev/spacepop/data/PfPR/Raster Data/PfPR_rmean/2019_Global_PfPR_2017.tif"},
+            {"admin", "/home/adolgert/dev/spacepop/data/maplibrary/UGA_boundaries.shp"},
+    };
     po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, parser()), vm);
+    po::store(po::parse_command_line(argc, argv, parser(input_path)), vm);
     po::notify(vm);
 
     if (vm.count("help")) {
-        cout << parser() << endl;
+        cout << parser(input_path) << endl;
         return 0;
     }
-    fs::path filename{"/home/adolgert/dev/spacepop/data/hrsl_uga_pop.tif"};
-    if (vm.count("settlement")) {
-        filename = vm["settlement"].as<fs::path>();
-    } else {
-        cout << "Using default file " << filename << endl;
+    if (!read_paths_from_command_line_args(vm, input_path)) {
+        return 3;
     }
+
     int use_subset_of_tiles = 0;  // Use only a few tiles in the corner.
     if (vm.count("tile-subset")) {
         use_subset_of_tiles = vm["tile-subset"].as<int>();
@@ -85,14 +104,10 @@ int main(int argc, char* argv[]) {
         return RUN_ALL_TESTS();
     }
 
-    if (!fs::exists(filename)) {
-        cout << "Could not find file " << filename << "." << endl;
-        return 3;
-    }
     // This initializes GDAL's list of drivers to read and write files.
     GDALAllRegister();
-
-    auto dataset = OpenGeoTiff(filename);
+    cout << "hrsl " << input_path.at("settlement") << endl;
+    auto dataset = OpenGeoTiff(input_path.at("settlement"));
     GDALRasterBand* band = dataset->GetRasterBand(1);
     std::vector<Point> points;
     gdal_raster_points(std::back_inserter(points), band, population_cutoff, use_subset_of_tiles);

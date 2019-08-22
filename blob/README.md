@@ -1,3 +1,4 @@
+## Install Libraries on Ubuntu
 sudo apt install gdal-bin gdal-data libalgorithms1 libbase1 libfileclasses1 libgdal-dev libgdal-doc libgdal-grass libgdal-java libgdal-perl libgdal20 libgdal-perl-doc libimageclasses1 liblasclasses1 libotbgdaladapters-6.6-1 libotbiogdal-6.6-1 node-srs pktools pktools-dev
 python3-csvkit python3-rasterio r-cran-sf r-cran-stars rasterio
 
@@ -6,3 +7,106 @@ python3-csvkit python3-rasterio r-cran-sf r-cran-stars rasterio
  - node-srs which is spatial reference for node.js.
  - rasterio - command line for geospatial raster layers
  - pktools GDAL add-on for raster processing
+
+
+## Coordinate systems
+Uganda Lat-long bounding box
+* Latitude range: 4.5, -1.6
+* Longitude range: 29.4, 35.1
+
+## High-resolution settlement layer
+The HRSL is in 30m-ish resolution,
+where the -ish is because it's on a regular lat-long grid,
+not in projection.
+```
+$ gdalinfo hrsl_uga_pop.tif
+Driver: GTiff/GeoTIFF
+Files: hrsl_uga_pop.tif
+       hrsl_uga_pop.tif.ovr
+       hrsl_uga_pop.tif.aux.xml
+Size is 19536, 20540
+Coordinate System is:
+GEOGCS["WGS 84",
+    DATUM["WGS_1984",
+        SPHEROID["WGS 84",6378137,298.257223563,
+            AUTHORITY["EPSG","7030"]],
+        AUTHORITY["EPSG","6326"]],
+    PRIMEM["Greenwich",0],
+    UNIT["degree",0.0174532925199433],
+    AUTHORITY["EPSG","4326"]]
+Origin = (29.573476945700001,4.228134261810000)
+Pixel Size = (0.000277777780000,-0.000277777780000)
+Metadata:
+  AREA_OR_POINT=Area
+  DataType=Generic
+Image Structure Metadata:
+  COMPRESSION=LZW
+  INTERLEAVE=BAND
+Corner Coordinates:
+Upper Left  (  29.5734769,   4.2281343) ( 29d34'24.52"E,  4d13'41.28"N)
+Lower Left  (  29.5734769,  -1.4774213) ( 29d34'24.52"E,  1d28'38.72"S)
+Upper Right (  35.0001437,   4.2281343) ( 35d 0' 0.52"E,  4d13'41.28"N)
+Lower Right (  35.0001437,  -1.4774213) ( 35d 0' 0.52"E,  1d28'38.72"S)
+Center      (  32.2868103,   1.3753565) ( 32d17'12.52"E,  1d22'31.28"N)
+Band 1 Block=128x128 Type=Float64, ColorInterp=Gray
+  Min=0.461 Max=265.642 
+  Minimum=0.461, Maximum=265.642, Mean=8.357, StdDev=6.256
+  NoData Value=-1.79769300000000005e+308
+  Overviews: 9768x10270, 4884x5135, 2442x2568, 1221x1284, 611x642, 306x321, 153x161
+  Metadata:
+    RepresentationType=ATHEMATIC
+    STATISTICS_COVARIANCES=39.13179870426735
+    STATISTICS_MAXIMUM=265.64248129217
+    STATISTICS_MEAN=8.3569307275022
+    STATISTICS_MINIMUM=0.46121201315056
+    STATISTICS_SKIPFACTORX=1
+    STATISTICS_SKIPFACTORY=1
+    STATISTICS_STDDEV=6.255541439737
+```
+
+### PfPR from Malaria Atlas Project
+The PfPR is also on a lat-long grid, not in projection,
+this time in about 5km tiles.
+```
+$ gdalinfo 2019_Global_PfPR_2015.tif
+   Driver: GTiff/GeoTIFF
+   Files: 2019_Global_PfPR_2015.tif
+          2019_Global_PfPR_2015.tif.aux.xml
+   Size is 6927, 2607
+   Coordinate System is:
+   GEOGCS["WGS 84",
+       DATUM["WGS_1984",
+           SPHEROID["WGS 84",6378137,298.257223563,
+               AUTHORITY["EPSG","7030"]],
+           AUTHORITY["EPSG","6326"]],
+       PRIMEM["Greenwich",0],
+       UNIT["degree",0.0174532925199433],
+       AUTHORITY["EPSG","4326"]]
+   Origin = (-118.375000000000000,53.541623217000001)
+   Pixel Size = (0.041666650000000,-0.041666650000000)
+   Metadata:
+     AREA_OR_POINT=Area
+   Image Structure Metadata:
+     COMPRESSION=LZW
+     INTERLEAVE=BAND
+   Corner Coordinates:
+   Upper Left  (-118.3750000,  53.5416232) (118d22'30.00"W, 53d32'29.84"N)
+   Lower Left  (-118.3750000, -55.0833333) (118d22'30.00"W, 55d 5' 0.00"S)
+   Upper Right ( 170.2498845,  53.5416232) (170d14'59.58"E, 53d32'29.84"N)
+   Lower Right ( 170.2498845, -55.0833333) (170d14'59.58"E, 55d 5' 0.00"S)
+   Center      (  25.9374423,  -0.7708551) ( 25d56'14.79"E,  0d46'15.08"S)
+   Band 1 Block=256x256 Type=Float64, ColorInterp=Gray
+     Min=0.000 Max=0.875 
+     Minimum=0.000, Maximum=0.875, Mean=0.048, StdDev=0.121
+     NoData Value=-9999
+     Overviews: 3464x1304, 1732x652, 866x326, 433x163
+     Metadata:
+       STATISTICS_MAXIMUM=0.87466576814651
+       STATISTICS_MEAN=0.047807271344601
+       STATISTICS_MINIMUM=0
+       STATISTICS_STDDEV=0.12072164533226
+       STATISTICS_VALID_PERCENT=20.82
+```
+
+## Random Shapefile for Level 1 districts
+In lat-long format.

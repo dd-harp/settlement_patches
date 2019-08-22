@@ -24,25 +24,13 @@
 #include "pixel.h"
 
 namespace spacepop {
-    typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-    typedef Kernel::FT FT;
-    typedef Kernel::Point_2 Point;
-    typedef Kernel::Segment_2 Segment;
-    typedef CGAL::Alpha_shape_vertex_base_2<Kernel> Vb;
-    typedef CGAL::Alpha_shape_face_base_2<Kernel> Fb;
-    typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
-    typedef CGAL::Delaunay_triangulation_2<Kernel, Tds> Triangulation_2;
-    typedef CGAL::Alpha_shape_2<Triangulation_2> Alpha_shape_2;
-    typedef Alpha_shape_2::Alpha_shape_edges_iterator Alpha_shape_edges_iterator;
-    typedef Alpha_shape_2::Alpha_shape_vertices_iterator Alpha_shape_vertices_iterator;
-    typedef Alpha_shape_2::Vertex_handle Vertex_handle;
 
 /*! Is this edge or point on the boundary of the complex?
  * or is it internal? */
     template<typename ComplexElement, typename Complex>
     bool EdgePoint(const ComplexElement &point, const Complex &complex) {
         auto classification = complex.classify(point);
-        return classification == Alpha_shape_2::SINGULAR || classification == Alpha_shape_2::REGULAR;
+        return classification == Complex::SINGULAR || classification == Complex::REGULAR;
     }
 
 
@@ -55,6 +43,14 @@ namespace spacepop {
     template<typename PointList>
     std::map<PixelKey, std::shared_ptr<std::vector<size_t>>>
     PixelSets(const PointList &points, double alpha, uint32 scan_length) {
+        typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
+        typedef Kernel::FT FT;
+        typedef CGAL::Alpha_shape_vertex_base_2<Kernel> Vb;
+        typedef CGAL::Alpha_shape_face_base_2<Kernel> Fb;
+        typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
+        typedef CGAL::Delaunay_triangulation_2<Kernel, Tds> Triangulation_2;
+        typedef CGAL::Alpha_shape_2<Triangulation_2> Alpha_shape_2;
+        typedef Alpha_shape_2::Vertex_handle Vertex_handle;
 
         Alpha_shape_2 complex(
                 points.begin(), points.end(),

@@ -1,7 +1,3 @@
-//
-// Created by adolgert on 8/7/19.
-//
-
 #ifndef BLOB_SIMPLE_PATCHES_H
 #define BLOB_SIMPLE_PATCHES_H
 

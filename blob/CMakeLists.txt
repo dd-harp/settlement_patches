@@ -70,7 +70,7 @@ find_library(
         )
 
 add_executable(blob main.cpp read_tiff.h connected_settlements.h pixel.h simple_patches.h
-        shapefile.h gdal_raster.h gdal_raster.cpp gdal_vector.h simple_patches_test.cpp)
+        shapefile.h gdal_raster.h gdal_raster.cpp gdal_vector.h simple_patches_test.cpp gdal_vector.cpp)
 add_to_cached_list(CGAL_EXECUTABLE_TARGETS blob )
 
 # Link the executable to CGAL and third-party libraries

@@ -1,7 +1,3 @@
-//
-// Created by adolgert on 8/7/19.
-//
-
 #ifndef BLOB_CONNECTED_SETTLEMENTS_H
 #define BLOB_CONNECTED_SETTLEMENTS_H
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>

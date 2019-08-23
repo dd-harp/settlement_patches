@@ -10,21 +10,7 @@ using namespace std;
 namespace fs = std::filesystem;
 
 namespace spacepop {
-void OpenShapefile(const std::filesystem::path &shapefile_path)
-{
-    auto dataset = static_cast<GDALDataset *>(GDALOpenEx(
-            shapefile_path.c_str(),
-            GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
-            nullptr,
-            nullptr,
-            nullptr
-    ));
-    if (dataset == nullptr) {
-        cout << "Could not load dataset from " << shapefile_path << endl;
-        return;
-    }
-    for (auto layer: dataset->GetLayers()) {
-        cout << "layer " << layer->GetName() << endl;
+    void print_layer_features(OGRLayer *layer) {
         for (auto& feature: layer) {
             bool comma{false};
             for (auto&& oField: *feature) {
@@ -54,17 +40,31 @@ void OpenShapefile(const std::filesystem::path &shapefile_path)
             }
             cout << endl;
         }
+    }
 
+    void print_layer_geometry(OGRLayer *layer) {
         for (auto& geom_feature: layer) {
             auto geometry = geom_feature->GetGeometryRef();
             if (geometry != nullptr) {
                 cout << "geometry " << geometry->getGeometryName() << " " << geometry->getGeometryType() << endl;
                 if (geometry->getGeometryType() == wkbLineString) {
-                    auto line_string = dynamic_cast<OGRLineString*>(geometry);
-                    std::cout << "is closed: " << line_string->get_IsClosed() << endl;
-                    for (auto& point: line_string) {
-                        std::cout << "(" << point.getX() << "," << point.getY() << ") ";
+                    auto line_string = dynamic_cast<OGRLineString *>(geometry);
+                    cout << "is closed: " << line_string->get_IsClosed() << endl;
+                    for (auto &point: line_string) {
+                        cout << "(" << point.getX() << "," << point.getY() << ") ";
                     }
+                    cout << endl;
+                } else if (geometry->getGeometryType() == wkbPolygon) {
+                    auto polygon = dynamic_cast<OGRPolygon *>(geometry);
+                    cout << "has curve " << polygon->hasCurveGeometry() << " "
+                         << "exterior points " << polygon->getExteriorRing()->getNumPoints() << endl;
+                } else if (geometry->getGeometryType() == wkbMultiPolygon){
+                    auto multi_polygon = dynamic_cast<OGRMultiPolygon*>(geometry);
+                    int total_points = 0;
+                    for (auto& sub_poly: multi_polygon) {
+                        total_points += sub_poly->getExteriorRing()->getNumPoints();
+                    }
+                    cout << "multipolygon has points " << total_points << endl;
                 } else {
                     cout << "unknown geometry type" << endl;
                 }
@@ -72,6 +72,32 @@ void OpenShapefile(const std::filesystem::path &shapefile_path)
                 cout << "No geometry for feature" << endl;
             }
         }
+    }
+
+    void OpenShapefile(const std::filesystem::path &shapefile_path)
+{
+    auto dataset = static_cast<GDALDataset *>(GDALOpenEx(
+            shapefile_path.c_str(),
+            GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
+            nullptr,
+            nullptr,
+            nullptr
+    ));
+    if (dataset == nullptr) {
+        cout << "Could not load dataset from " << shapefile_path << endl;
+        return;
+    }
+    for (auto layer: dataset->GetLayers()) {
+        cout << "layer " << layer->GetName() << endl;
+        auto feature_definition = layer->GetLayerDefn();
+        for (int field_idx=0; field_idx < feature_definition->GetFieldCount(); ++field_idx) {
+            OGRFieldDefn* field_definition = feature_definition->GetFieldDefn(field_idx);
+            cout << "\tfeature " << field_definition->GetNameRef() << " "
+                << OGRFieldDefn::GetFieldTypeName(field_definition->GetType()) << endl;
+        }
+
+//        print_layer_features(layer);
+        print_layer_geometry(layer);
     }
 }
 

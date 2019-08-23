@@ -108,5 +108,50 @@ $ gdalinfo 2019_Global_PfPR_2015.tif
        STATISTICS_VALID_PERCENT=20.82
 ```
 
+## Districts from humdata
+The features tell you the enclosing admin units.
+```
+layer uga_admbnda_adm3_UBOS_v5
+	feature ADM0_EN String
+	feature ADM0_PCODE String
+	feature ADM1_EN String
+	feature ADM1_PCODE String
+	feature ADM2_EN String
+	feature ADM2_PCODE String
+	feature ADM3_EN String
+	feature ADM3_PCODE String
+ADM0_EN=Uganda,ADM0_PCODE=UG,ADM1_EN=ABIM,ADM1_PCODE=UG314,ADM2_EN=LABWOR,ADM2_PCODE=UG3141,ADM3_EN=ABIM,ADM3_PCODE=UG314101
+ADM0_EN=Uganda,ADM0_PCODE=UG,ADM1_EN=ABIM,ADM1_PCODE=UG314,ADM2_EN=LABWOR,ADM2_PCODE=UG3141,ADM3_EN=ABIM TOWN COUNCIL,ADM3_PCODE=UG314102
+ADM0_EN=Uganda,ADM0_PCODE=UG,ADM1_EN=ABIM,ADM1_PCODE=UG314,ADM2_EN=LABWOR,ADM2_PCODE=UG3141,ADM3_EN=ALEREK,ADM3_PCODE=UG314103
+```
+
 ## Random Shapefile for Level 1 districts
 In lat-long format.
+
+## The Plan
+
+This should make patches to use for simulation. The target data structure is
+
+ * A vector shapefile
+ * with polygons that describe each patch
+ * feature for which admin unit contains each patch
+ * feature for population count
+ * feature for PfPR for the patch
+
+There are a few possible intermediate formats that might be helpful.
+Let's list them and choose.
+
+ 1. A raster where each point says
+    * how much population is there
+    * how much PfPR
+    * percentage of the point in each containing admin
+    
+ 2. A raster where each point says
+    * how much population is there
+    * how much PfPR
+    * a single containing admin
+
+ 3. A vector where each polygon says
+    * how much population
+    * what PfPR
+    * containing admin unit

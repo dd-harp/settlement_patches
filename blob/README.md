@@ -125,8 +125,23 @@ ADM0_EN=Uganda,ADM0_PCODE=UG,ADM1_EN=ABIM,ADM1_PCODE=UG314,ADM2_EN=LABWOR,ADM2_P
 ADM0_EN=Uganda,ADM0_PCODE=UG,ADM1_EN=ABIM,ADM1_PCODE=UG314,ADM2_EN=LABWOR,ADM2_PCODE=UG3141,ADM3_EN=ALEREK,ADM3_PCODE=UG314103
 ```
 
-## Random Shapefile for Level 1 districts
+The Humdata level 3 admins have polygons and multipolygons, meaning the multipolygons have
+more than one exterior ring and the polygons can have interior rings.
+
+The proj.4 is
+```
+PROJ.4 : +proj=longlat +datum=WGS84 +no_defs
+```
+
+## Maplibrary Shapefile for Level 1 districts
 In lat-long format.
+There are four attributes
+
+ * INDEX - unique within the file, not keyed to anything outside.
+ * LEFT - Can be -1. Otherwise is an index.
+ * RIGHT - Can be the same as this index.
+ * LEVEL - 0-3
+
 
 ## The Plan
 

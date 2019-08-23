@@ -96,8 +96,8 @@ namespace spacepop {
                 << OGRFieldDefn::GetFieldTypeName(field_definition->GetType()) << endl;
         }
 
-//        print_layer_features(layer);
-        print_layer_geometry(layer);
+        print_layer_features(layer);
+//        print_layer_geometry(layer);
     }
 }
 

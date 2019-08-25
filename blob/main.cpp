@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
 
     auto projection_ref = settlement_dataset->GetProjectionRef();
     OGRSpatialReference lat_long_srs(projection_ref);
-    reproject(&lat_long_srs);
+    auto to_projected = reproject(&lat_long_srs);
     return 0;
 //    std::vector<Point> points;
 //    gdal_raster_points(

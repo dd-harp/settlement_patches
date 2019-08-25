@@ -108,6 +108,63 @@ $ gdalinfo 2019_Global_PfPR_2015.tif
        STATISTICS_VALID_PERCENT=20.82
 ```
 
+## Districts from Local Burden of Disease
+The LBD group creates admin files for the whole world. Unfortunately, they
+stop at Admin 2 units. They are available at /home/j/WORK/11_geospatial/admin_shapefiles/current.
+Looks like WGS84 and polygons.
+
+```
+$ ogrinfo lbd_standard_admin_2.shp lbd_standard_admin_2 | head -100
+INFO: Open of `lbd_standard_admin_2.shp'
+      using driver `ESRI Shapefile' successful.
+
+Layer name: lbd_standard_admin_2
+Metadata:
+  DBF_DATE_LAST_UPDATE=2019-08-23
+Geometry: Polygon
+Feature Count: 47358
+Extent: (-180.000000, -90.000000) - (180.000000, 83.658333)
+Layer SRS WKT:
+GEOGCS["WGS 84",
+    DATUM["WGS_1984",
+        SPHEROID["WGS 84",6378137,298.257223563,
+            AUTHORITY["EPSG","7030"]],
+        AUTHORITY["EPSG","6326"]],
+    PRIMEM["Greenwich",0,
+        AUTHORITY["EPSG","8901"]],
+    UNIT["degree",0.0174532925199433,
+        AUTHORITY["EPSG","9122"]],
+    AUTHORITY["EPSG","4326"]]
+NAME_0: String (80.0)
+NAME_1: String (80.0)
+NAME_2: String (80.0)
+geo_id: Real (19.11)
+ad2_id: Integer64 (10.0)
+ad0_parent: Integer64 (10.0)
+ad1_parent: Integer64 (10.0)
+ADM2_CODE: Integer64 (10.0)
+ADM2_NAME: String (100.0)
+ADM1_CODE: Integer64 (10.0)
+ADM1_NAME: String (100.0)
+ADM0_CODE: Integer64 (10.0)
+ADM0_NAME: String (100.0)
+OGRFeature(lbd_standard_admin_2):0
+  NAME_0 (String) = Mexico
+  NAME_1 (String) = Aguascalientes
+  NAME_2 (String) = Aguascalientes
+  geo_id (Real) = 1001143.00000000000
+  ad2_id (Integer64) = 1
+  ad0_parent (Integer64) = 143
+  ad1_parent (Integer64) = 1
+  ADM2_CODE (Integer64) = 1001143
+  ADM2_NAME (String) = Aguascalientes
+  ADM1_CODE (Integer64) = 1143
+  ADM1_NAME (String) = Aguascalientes
+  ADM0_CODE (Integer64) = 143
+  ADM0_NAME (String) = Mexico
+  POLYGON(...
+```
+
 ## Districts from humdata
 The features tell you the enclosing admin units.
 ```

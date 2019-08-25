@@ -7,7 +7,14 @@
 using namespace std;
 
 namespace spacepop {
-    void reproject(OGRSpatialReference* purely_lat_long_srs) {
+
+    struct CoordinateTransformClose {
+        void operator()(OGRCoordinateTransformation* ct) const {
+            OGRCoordinateTransformation::DestroyCT(ct);
+        }
+    };
+
+    shared_ptr<OGRCoordinateTransformation> reproject(OGRSpatialReference* purely_lat_long_srs) {
         // srs = Spatial Reference System
         OGRSpatialReference uganda_projected_srs;
 
@@ -19,6 +26,6 @@ namespace spacepop {
             uganda_projected_srs.GetLinearUnits(nullptr) << " [m]" << endl;
 
         auto transform_in = OGRCreateCoordinateTransformation(purely_lat_long_srs, &uganda_projected_srs);
-        auto transform_out = OGRCreateCoordinateTransformation(&uganda_projected_srs, purely_lat_long_srs);
+        return shared_ptr<OGRCoordinateTransformation>(transform_in, CoordinateTransformClose());
     }
 }

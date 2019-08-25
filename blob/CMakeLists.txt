@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.13)  # Maybe 3.14 required?
 project(blob)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+message(STATUS "Cmake module path ${CMAKE_MODULE_PATH}")
 include(GoogleTest)
 
 # Download and unpack googletest at configure time
@@ -63,6 +65,12 @@ if ( NOT Boost_FOUND )
 
 endif()
 
+# Geographic lib
+find_package (GeographicLib 1.34 REQUIRED)
+include_directories (${GeographicLib_INCLUDE_DIRS})
+add_definitions (${GeographicLib_DEFINITIONS})
+
+
 find_library(
         LIBTIFF
         NAMES tiff
@@ -70,7 +78,7 @@ find_library(
         )
 
 add_executable(blob main.cpp read_tiff.h connected_settlements.h pixel.h simple_patches.h
-        shapefile.h gdal_raster.h gdal_raster.cpp gdal_vector.h simple_patches_test.cpp gdal_vector.cpp)
+        shapefile.h gdal_raster.h gdal_raster.cpp gdal_vector.h simple_patches_test.cpp gdal_vector.cpp projection.h projection.cpp)
 add_to_cached_list(CGAL_EXECUTABLE_TARGETS blob )
 
 # Link the executable to CGAL and third-party libraries
@@ -78,6 +86,7 @@ target_link_libraries(
         blob
         ${CGAL_LIBRARIES}
         ${CGAL_3RD_PARTY_LIBRARIES}
+        ${GeographicLib_LIBRARIES}
         geotiff tiff gdal
         stdc++fs boost_program_options
         gtest_main

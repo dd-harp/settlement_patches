@@ -7,7 +7,7 @@ python3-csvkit python3-rasterio r-cran-sf r-cran-stars rasterio
  - node-srs which is spatial reference for node.js.
  - rasterio - command line for geospatial raster layers
  - pktools GDAL add-on for raster processing
-
+ - libgeographic-dev - transforms coordinates
 
 ## Coordinate systems
 Uganda Lat-long bounding box

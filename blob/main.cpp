@@ -14,9 +14,10 @@
 #include "gdal/gdal_priv.h"
 #include "gtest/gtest.h"
 
+#include "connected_settlements.h"
 #include "gdal_raster.h"
 #include "gdal_vector.h"
-#include "connected_settlements.h"
+#include "projection.h"
 #include "simple_patches.h"
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
@@ -81,7 +82,7 @@ int main(int argc, char* argv[]) {
     map<string,fs::path> input_path = {
             {"settlement", "/home/adolgert/dev/spacepop/data/hrsl/hrsl_uga_pop.tif"},
             {"pfpr", "/home/adolgert/dev/spacepop/data/PfPR/Raster Data/PfPR_rmean/2019_Global_PfPR_2017.tif"},
-            {"admin", "/home/adolgert/dev/spacepop/data/data/uga_admbnda/uga_admbnda_adm3_UBOS_v5.shp"},
+            {"admin", "/home/adolgert/dev/spacepop/data/uga_admbnda/uga_admbnda_adm3_UBOS_v5.shp"},
     };
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, parser(input_path)), vm);
@@ -119,6 +120,9 @@ int main(int argc, char* argv[]) {
 
     OpenShapefile(input_path.at("admin"));
 
+    auto projection_ref = settlement_dataset->GetProjectionRef();
+    OGRSpatialReference lat_long_srs(projection_ref);
+    reproject(&lat_long_srs);
     return 0;
 //    std::vector<Point> points;
 //    gdal_raster_points(

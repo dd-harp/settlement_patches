@@ -1,28 +1,14 @@
 
 #include <filesystem>
 #include <iostream>
-#include <list>
-#include <vector>
-#include <cmath>
 #include <boost/program_options.hpp>
 
-#include "CGAL/Exact_predicates_inexact_constructions_kernel.h"
-#include "CGAL/Alpha_shape_2.h"
-#include "CGAL/Alpha_shape_vertex_base_2.h"
-#include "CGAL/Alpha_shape_face_base_2.h"
-#include "CGAL/Delaunay_triangulation_2.h"
 #include "gdal/gdal_priv.h"
 #include "gdal/ogrsf_frmts.h"
 #include "gtest/gtest.h"
 
-#include "connected_settlements.h"
 #include "gdal_raster.h"
-#include "gdal_vector.h"
 #include "projection.h"
-#include "simple_patches.h"
-
-typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
-typedef Kernel::Point_2 Point;
 
 using namespace spacepop;
 using namespace std;

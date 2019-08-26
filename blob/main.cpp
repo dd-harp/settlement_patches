@@ -12,6 +12,7 @@
 #include "CGAL/Alpha_shape_face_base_2.h"
 #include "CGAL/Delaunay_triangulation_2.h"
 #include "gdal/gdal_priv.h"
+#include "gdal/ogrsf_frmts.h"
 #include "gtest/gtest.h"
 
 #include "connected_settlements.h"
@@ -118,11 +119,43 @@ int main(int argc, char* argv[]) {
     auto pfpr_dataset = OpenGeoTiff(input_path.at("pfpr"));
     GDALRasterBand* pfpr_band = pfpr_dataset->GetRasterBand(1);
 
-    OpenShapefile(input_path.at("admin"));
-
     auto projection_ref = settlement_dataset->GetProjectionRef();
     OGRSpatialReference lat_long_srs(projection_ref);
     auto to_projected = reproject(&lat_long_srs);
+
+    auto admin_dataset = static_cast<GDALDataset *>(GDALOpenEx(
+            input_path.at("admin").c_str(),
+            GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
+            nullptr,
+            nullptr,
+            nullptr
+    ));
+    if (admin_dataset == nullptr) {
+        cout << "Could not load dataset from " << input_path.at("admin") << endl;
+        return 7;
+    }
+    if (admin_dataset->GetLayerCount() == 0) {
+        cout << "Admin dataset has no layers" << endl;
+        return 8;
+    }
+
+    // Loop over the admin layers, making patches within each layer.
+    OGRLayer* first_admin_layer = *admin_dataset->GetLayers().begin();
+    for (auto& admin_geometry: first_admin_layer) {
+        auto geometry = admin_geometry->GetGeometryRef();
+        if (geometry != nullptr) {
+            auto geometry_type = geometry->getGeometryType();
+            if (geometry_type == wkbPolygon || geometry_type == wkbMultiPolygon) {
+                OGRMultiPolygon* multi_polygon = geometry->toMultiPolygon();
+
+            } else {
+                cout << "geometry wasn't a polygon!" << endl;
+            }
+        } else {
+            cout << "geometry was null?" << endl;
+        }
+    }
+
     return 0;
 //    std::vector<Point> points;
 //    gdal_raster_points(

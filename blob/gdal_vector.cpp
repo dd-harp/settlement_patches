@@ -75,31 +75,32 @@ namespace spacepop {
     }
 
     void OpenShapefile(const std::filesystem::path &shapefile_path)
-{
-    auto dataset = static_cast<GDALDataset *>(GDALOpenEx(
-            shapefile_path.c_str(),
-            GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
-            nullptr,
-            nullptr,
-            nullptr
-    ));
-    if (dataset == nullptr) {
-        cout << "Could not load dataset from " << shapefile_path << endl;
-        return;
-    }
-    for (auto layer: dataset->GetLayers()) {
-        cout << "layer " << layer->GetName() << endl;
-        auto feature_definition = layer->GetLayerDefn();
-        for (int field_idx=0; field_idx < feature_definition->GetFieldCount(); ++field_idx) {
-            OGRFieldDefn* field_definition = feature_definition->GetFieldDefn(field_idx);
-            cout << "\tfeature " << field_definition->GetNameRef() << " "
-                << OGRFieldDefn::GetFieldTypeName(field_definition->GetType()) << endl;
+    {
+        auto dataset = static_cast<GDALDataset *>(GDALOpenEx(
+                shapefile_path.c_str(),
+                GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
+                nullptr,
+                nullptr,
+                nullptr
+        ));
+        if (dataset == nullptr) {
+            cout << "Could not load dataset from " << shapefile_path << endl;
+            return;
         }
+        for (auto layer: dataset->GetLayers()) {
+            cout << "layer " << layer->GetName() << endl;
+            auto feature_definition = layer->GetLayerDefn();
+            for (int field_idx=0; field_idx < feature_definition->GetFieldCount(); ++field_idx) {
+                OGRFieldDefn* field_definition = feature_definition->GetFieldDefn(field_idx);
+                cout << "\tfeature " << field_definition->GetNameRef() << " "
+                    << OGRFieldDefn::GetFieldTypeName(field_definition->GetType()) << endl;
+            }
 
-        print_layer_features(layer);
-//        print_layer_geometry(layer);
+            print_layer_features(layer);
+    //        print_layer_geometry(layer);
+        }
     }
-}
+
 
     void WriteVector(const std::filesystem::path &shape_filename) {
         // https://gdal.org/tutorials/vector_api_tut.html#writing-to-ogr

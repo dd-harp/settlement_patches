@@ -9,6 +9,8 @@
 
 #include "gdal_raster.h"
 #include "projection.h"
+#include "admin_patch.h"
+
 
 using namespace spacepop;
 using namespace std;
@@ -101,16 +103,16 @@ int main(int argc, char* argv[]) {
     cout << "hrsl " << input_path.at("settlement") << endl;
     auto settlement_dataset = OpenGeoTiff(input_path.at("settlement"));
     GDALRasterBand* settlement_pop_band = settlement_dataset->GetRasterBand(1);
-    double settlement_geo_transform[6];
-    if (settlement_dataset->GetGeoTransform(settlement_geo_transform) != CE_None) {
+    vector<double> settlement_geo_transform(6);
+    if (settlement_dataset->GetGeoTransform(&settlement_geo_transform[0]) != CE_None) {
         cout << "Could not get settlement transform" << endl;
         return 9;
     }
 
     auto pfpr_dataset = OpenGeoTiff(input_path.at("pfpr"));
     GDALRasterBand* pfpr_band = pfpr_dataset->GetRasterBand(1);
-    double pfpr_geo_transform[6];
-    if (settlement_dataset->GetGeoTransform(pfpr_geo_transform) != CE_None) {
+    vector<double> pfpr_geo_transform(6);
+    if (settlement_dataset->GetGeoTransform(&pfpr_geo_transform[0]) != CE_None) {
         cout << "Could not get pfpr transform" << endl;
         return 10;
     }
@@ -143,7 +145,8 @@ int main(int argc, char* argv[]) {
             auto geometry_type = geometry->getGeometryType();
             if (geometry_type == wkbPolygon || geometry_type == wkbMultiPolygon) {
                 OGRMultiPolygon* multi_polygon = geometry->toMultiPolygon();
-
+                CreatePatches(multi_polygon, settlement_pop_band, pfpr_band,
+                        settlement_geo_transform, pfpr_geo_transform);
             } else {
                 cout << "geometry wasn't a polygon!" << endl;
             }

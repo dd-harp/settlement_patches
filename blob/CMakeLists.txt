@@ -95,7 +95,7 @@ target_link_libraries(
 
 # Make a second executable that runs the tests.
 add_executable(blob_test test_main.cpp cgal_tutorial.cpp simple_patches_test.cpp simple_patches.h
-        admin_patch_test.cpp admin_patch.cpp admin_patch.h)
+        admin_patch_test.cpp admin_patch.cpp admin_patch.h projection.h projection.cpp)
 target_link_libraries(
         blob_test
         ${CGAL_LIBRARIES}

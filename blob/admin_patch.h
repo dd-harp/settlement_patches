@@ -23,7 +23,8 @@ namespace spacepop
      */
     void CreatePatches(
             OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* PfPR,
-            double* settlement_geo_transform, double* pfpr_geo_transform
+            const std::vector<double>& settlement_geo_transform,
+            const std::vector<double>& pfpr_geo_transform
             );
 }
 

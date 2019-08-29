@@ -6,45 +6,47 @@
 #include <boost/geometry/geometries/polygon.hpp>
 
 #include "admin_patch.h"
+#include "projection.h"
+
 using namespace boost::geometry;
 
-
+namespace spacepop {
 // These templates convince boost::geometry to treat
 // an array of two doubles as a Point type.
-namespace boost::geometry::traits {
-    template<> struct tag<std::array<double, 2>>
-    { typedef point_tag type; };
-    template<> struct coordinate_type<std::array<double, 2>>
-    { typedef double type; };
-    template<> struct coordinate_system<std::array<double, 2>>
-    { typedef cs::cartesian type; };
-    template<> struct dimension<std::array<double, 2>> : boost::mpl::int_<2> {};
-    template<>
-    struct access<std::array<double, 2>, 0> {
-        static double get(std::array<double, 2> const &p) {
-            return p[0];
-        }
-
-        static void set(std::array<double, 2> &p, double value) {
-            p[0] = value;
-        }
-    };
-
-    template<>
-    struct access<std::array<double, 2>, 1> {
-        static double get(std::array<double, 2> const &p) {
-            return p[1];
-        }
-
-        static void set(std::array<double, 2> &p, double value) {
-            p[1] = value;
-        }
-    };
-}
+//namespace boost::geometry::traits {
+//    template<> struct tag<std::array<double, 2>>
+//    { typedef point_tag type; };
+//    template<> struct coordinate_type<std::array<double, 2>>
+//    { typedef double type; };
+//    template<> struct coordinate_system<std::array<double, 2>>
+//    { typedef cs::cartesian type; };
+//    template<> struct dimension<std::array<double, 2>> : boost::mpl::int_<2> {};
+//    template<>
+//    struct access<std::array<double, 2>, 0> {
+//        static double get(std::array<double, 2> const &p) {
+//            return p[0];
+//        }
+//
+//        static void set(std::array<double, 2> &p, double value) {
+//            p[0] = value;
+//        }
+//    };
+//
+//    template<>
+//    struct access<std::array<double, 2>, 1> {
+//        static double get(std::array<double, 2> const &p) {
+//            return p[1];
+//        }
+//
+//        static void set(std::array<double, 2> &p, double value) {
+//            p[1] = value;
+//        }
+//    };
+//}
 
 
 //! Convert a lat-long into a specific pixel.
-std::array<int, 2> pixel_containing(std::array<double, 2> coord, double const* transform) {
+std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform) {
     return {
             static_cast<int>(std::lround(std::floor((1 / transform[1]) * (coord[0] - transform[0])))),
             static_cast<int>(std::lround(std::floor((1 / transform[5]) * (coord[1] - transform[3]))))
@@ -52,7 +54,8 @@ std::array<int, 2> pixel_containing(std::array<double, 2> coord, double const* t
 }
 
 //! Convert a pixel corner into a lat-long
-std::array<double, 2> pixel_coord(std::array<int, 2> pixel, double const* transform) {
+template<typename POINTISH>
+POINTISH pixel_coord(std::array<int, 2> pixel, const std::vector<double>& transform) {
     return {
         transform[0] + pixel[0] * transform[1] + pixel[1] * transform[2],
         transform[3] + pixel[1] * transform[4] + pixel[5]
@@ -61,12 +64,13 @@ std::array<double, 2> pixel_coord(std::array<int, 2> pixel, double const* transf
 
 //! Convert a pixel into its four corners as lat-long.
 //  Boost::polygon likes to be clockwise, so these are clockwise.
-std::vector<std::array<double, 2>> pixel_bounds(std::array<int, 2> pixel, double const* transform) {
+template<typename POINTISH>
+std::vector<POINTISH> pixel_bounds(std::array<int, 2> pixel, const std::vector<double>& transform) {
     return {
-        pixel_coord(pixel, transform),
-        pixel_coord({pixel[0], pixel[1] + 1}, transform),
-        pixel_coord({pixel[0] + 1, pixel[1] + 1}, transform),
-        pixel_coord({pixel[0] + 1, pixel[1]}, transform)
+        pixel_coord<POINTISH>(pixel, transform),
+        pixel_coord<POINTISH>({pixel[0], pixel[1] + 1}, transform),
+        pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
+        pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform)
     };
 }
 
@@ -81,10 +85,10 @@ class OnDemandRaster
     const int x{0}, y{1};  // To make notation clearer.
 
     GDALRasterBand* _band;
-    double* _transform;
+    const std::vector<double>& _transform;
     std::map<std::array<int,2>,std::vector<double>> _buffer;
 public:
-    OnDemandRaster(GDALRasterBand* band, double* geo_transform)
+    OnDemandRaster(GDALRasterBand* band, const std::vector<double>& geo_transform)
     : _band(band), _transform(geo_transform) {
         this->_band->GetBlockSize(&_block_size[x], &_block_size[y]);
         this->_size[x] = this->_band->GetXSize();
@@ -132,13 +136,16 @@ private:
 
 
 void CreatePatches(
-        OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* PfPR,
-        double* settlement_geo_transform, double* pfpr_geo_transform
+        OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* pfpr,
+        const std::vector<double>& settlement_geo_transform,
+        const std::vector<double>& pfpr_geo_transform
         )
 {
     const int x{0}, y{1};
     OGREnvelope polygon_bounding_box;
     admin->getEnvelope(&polygon_bounding_box);
+    std::cout << "polygon bbox ((" << polygon_bounding_box.MinX << ", " << polygon_bounding_box.MaxX << "), (("
+        << polygon_bounding_box.MinY << ", " << polygon_bounding_box.MaxY << "))" << std::endl;
 
     std::vector<std::array<int,2>> bounding_pixels;
     for (auto ex: {polygon_bounding_box.MinX, polygon_bounding_box.MaxX}) {
@@ -155,17 +162,23 @@ void CreatePatches(
         }
     }
 
+    auto [project, unproject] = projection_for_lat_long(polygon_bounding_box.MinY, polygon_bounding_box.MinX);
+
     auto settlement_arr = OnDemandRaster(settlement, settlement_geo_transform);
+    auto pfpr_arr = OnDemandRaster(pfpr, pfpr_geo_transform);
     const double cutoff = 0.1;
     using point = model::d2::point_xy<double>;
+    point p = {2.0, 3.7};
     using polygon = model::polygon<point>;
     for (int pixel_y=settlement_min[y]; pixel_y < settlement_max[y]; ++pixel_y) {
         for (int pixel_x=settlement_min[x]; pixel_x < settlement_max[x]; ++pixel_x) {
             if (settlement_arr.at({pixel_x, pixel_y}) > cutoff) {
                 // if the settlement pop > cutoff.
                 polygon pixel_poly;
-                append(pixel_poly, pixel_bounds({pixel_x, pixel_y}, settlement_geo_transform));
+                append(pixel_poly, pixel_bounds<point>({pixel_x, pixel_y}, settlement_geo_transform));
             }
         }
     }
+}
+
 }

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 
 #include "gdal/gdal_priv.h"
 
@@ -29,5 +30,24 @@ namespace spacepop {
 
         auto transform_in = OGRCreateCoordinateTransformation(purely_lat_long_srs, &uganda_projected_srs);
         return shared_ptr<OGRCoordinateTransformation>(transform_in, CoordinateTransformClose());
+    }
+
+    tuple<shared_ptr<OGRCoordinateTransformation>,shared_ptr<OGRCoordinateTransformation>>
+    projection_for_lat_long(double latitude, double longitude) {
+        OGRSpatialReference pure_lat_long;
+        pure_lat_long.SetWellKnownGeogCS("WGS84");
+
+        int target_utm = static_cast<int>(lround(ceil((longitude + 180) / 6)));
+        int North = (latitude > 0) ? 1 : 0;
+        OGRSpatialReference target_srs;
+        stringstream utm_name;
+        utm_name << "UTM" << target_utm << ((North == 1) ? 'N' : 'S');
+        target_srs.SetProjCS(utm_name.str().c_str());
+        target_srs.SetUTM(target_utm, North);
+        auto transform_in = shared_ptr<OGRCoordinateTransformation>(
+                OGRCreateCoordinateTransformation(&pure_lat_long, &target_srs));
+        auto transform_out = shared_ptr<OGRCoordinateTransformation>(
+                OGRCreateCoordinateTransformation(&target_srs, &pure_lat_long));
+        return {transform_in, transform_out};
     }
 }

@@ -9,6 +9,40 @@
 using namespace boost::geometry;
 
 
+// These templates convince boost::geometry to treat
+// an array of two doubles as a Point type.
+namespace boost::geometry::traits {
+    template<> struct tag<std::array<double, 2>>
+    { typedef point_tag type; };
+    template<> struct coordinate_type<std::array<double, 2>>
+    { typedef double type; };
+    template<> struct coordinate_system<std::array<double, 2>>
+    { typedef cs::cartesian type; };
+    template<> struct dimension<std::array<double, 2>> : boost::mpl::int_<2> {};
+    template<>
+    struct access<std::array<double, 2>, 0> {
+        static double get(std::array<double, 2> const &p) {
+            return p[0];
+        }
+
+        static void set(std::array<double, 2> &p, double value) {
+            p[0] = value;
+        }
+    };
+
+    template<>
+    struct access<std::array<double, 2>, 1> {
+        static double get(std::array<double, 2> const &p) {
+            return p[1];
+        }
+
+        static void set(std::array<double, 2> &p, double value) {
+            p[1] = value;
+        }
+    };
+}
+
+
 //! Convert a lat-long into a specific pixel.
 std::array<int, 2> pixel_containing(std::array<double, 2> coord, double const* transform) {
     return {

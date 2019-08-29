@@ -16,8 +16,15 @@ namespace spacepop
      *                   This should be pixels, but in Geographic units.
      * @param PfPR Prevalence of Malaria within that population, to assign to the patch.
      *             This should be pixels, but in Geographic units.
+     * @param settlement_geo_transform Raster space (Pixel, Line) to projection coordinate (Xp, Yp)
+     *                                 Xp = padfTransform[0] + P*padfTransform[1] + L*padfTransform[2];
+     *                                 Yp = padfTransform[3] + P*padfTransform[4] + L*padfTransform[5];
+     * @param pfpr_geo_transform Also a transformation from (P,L) to (Xp, Yp).
      */
-    void CreatePatches(OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* PfPR);
+    void CreatePatches(
+            OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* PfPR,
+            double* settlement_geo_transform, double* pfpr_geo_transform
+            );
 }
 
 #endif //BLOB_ADMIN_PATCH_H

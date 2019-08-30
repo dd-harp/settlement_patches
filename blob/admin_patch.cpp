@@ -9,6 +9,7 @@
 #include "projection.h"
 
 using namespace boost::geometry;
+using namespace std;
 
 namespace spacepop {
 // These templates convince boost::geometry to treat
@@ -162,21 +163,43 @@ void CreatePatches(
         }
     }
 
-    auto [project, unproject] = projection_for_lat_long(polygon_bounding_box.MinY, polygon_bounding_box.MinX);
-
     auto settlement_arr = OnDemandRaster(settlement, settlement_geo_transform);
     auto pfpr_arr = OnDemandRaster(pfpr, pfpr_geo_transform);
+
+    struct PixelData {
+        double pfpr;
+        double pop;
+    };
+
     const double cutoff = 0.1;
-    using point = model::d2::point_xy<double>;
-    point p = {2.0, 3.7};
-    using polygon = model::polygon<point>;
+    map<array<int, 2>,PixelData> settlement_pfpr;
     for (int pixel_y=settlement_min[y]; pixel_y < settlement_max[y]; ++pixel_y) {
-        for (int pixel_x=settlement_min[x]; pixel_x < settlement_max[x]; ++pixel_x) {
-            if (settlement_arr.at({pixel_x, pixel_y}) > cutoff) {
-                // if the settlement pop > cutoff.
-                polygon pixel_poly;
-                append(pixel_poly, pixel_bounds<point>({pixel_x, pixel_y}, settlement_geo_transform));
+        for (int pixel_x = settlement_min[x]; pixel_x < settlement_max[x]; ++pixel_x) {
+            double pixel_pop = settlement_arr.at({pixel_x, pixel_y});
+            if (pixel_pop > cutoff) {
+                auto settlement_coord = pixel_coord<array<double, 2>>({pixel_x, pixel_y}, settlement_geo_transform);
+                PixelData pd{pfpr_arr.at_coord(pixel_x, pixel_y), pixel_pop};
+                array<int, 2> create_pixel{pixel_x, pixel_y};
+                settlement_pfpr.insert(make_pair(create_pixel, pd));
             }
+        }
+    }
+
+    auto [project, unproject] = projection_for_lat_long(polygon_bounding_box.MinY, polygon_bounding_box.MinX);
+
+    admin->transform(project.get());
+
+    using point = model::d2::point_xy<double>;
+    using polygon = model::polygon<point>;
+    for (const auto& pixel_iter: settlement_pfpr) {
+        polygon pixel_poly;
+        auto bounds = pixel_bounds<point>(pixel_iter.first, settlement_geo_transform);
+        for (auto& bound: bounds) {
+            double bx{get<0>(bound)};
+            double by{get<1>(bound)};
+            project->Transform(1, &bx, &by);
+            boost::geometry::set<0>(bound, bx);
+            boost::geometry::set<1>(bound, by);
         }
     }
 }

@@ -1,4 +1,5 @@
 #include <cmath>
+#include <deque>
 #include <iostream>
 
 #include <boost/geometry.hpp>
@@ -45,6 +46,10 @@ namespace spacepop {
 //    };
 //}
 
+namespace bg = boost::geometry;
+using dpoint = model::d2::point_xy<double>;
+using dpolygon = model::polygon<dpoint>;
+using dmpolygon = model::multi_polygon<dpolygon>;
 
 //! Convert a lat-long into a specific pixel.
 std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform) {
@@ -63,6 +68,7 @@ POINTISH pixel_coord(std::array<int, 2> pixel, const std::vector<double>& transf
     };
 }
 
+
 //! Convert a pixel into its four corners as lat-long.
 //  Boost::polygon likes to be clockwise, so these are clockwise.
 template<typename POINTISH>
@@ -73,6 +79,35 @@ std::vector<POINTISH> pixel_bounds(std::array<int, 2> pixel, const std::vector<d
         pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
         pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform)
     };
+}
+
+
+/*! Convert a GDAL OGRMultiPolygon into a Boost multi_polygon
+ *
+ * @param gdal_poly Reads but does not write this.
+ * @return Boost multi_polygon
+ */
+dmpolygon convert(OGRMultiPolygon const* gdal_poly) {
+    dmpolygon dpoly;
+    dpoly.resize(gdal_poly->getNumGeometries());
+    int poly_idx{0};
+    for (const auto& child_poly: gdal_poly) {
+        dpolygon& single{dpoly[poly_idx]};
+        OGRLinearRing const* exterior = child_poly->getExteriorRing();
+        bool outer_clock = exterior->isClockwise();  // XXX track clockwise or CCW
+        for (const auto& gd_pt: exterior) {
+            append(single.outer(), dpoint{gd_pt.getX(), gd_pt.getY()});
+        }
+        single.inners().resize(child_poly->getNumInteriorRings());
+        for (int inner=0; inner < child_poly->getNumInteriorRings(); ++inner) {
+            OGRLinearRing const* interior = child_poly->getInteriorRing(inner);
+            for (const auto& in_pt: interior) {
+                append(single.inners()[inner], dpoint{in_pt.getX(), in_pt.getY()});
+            }
+        }
+        ++poly_idx;
+    }
+    return dpoly;
 }
 
 
@@ -92,7 +127,7 @@ public:
     OnDemandRaster(GDALRasterBand* band, const std::vector<double>& geo_transform)
     : _band(band), _transform(geo_transform) {
         this->_band->GetBlockSize(&_block_size[x], &_block_size[y]);
-        this->_size[x] = this->_band->GetXSize();
+        this->_size[x] = this->_band->GetXSize();  // Track long, lat vs lat, long.
         this->_size[y] = this->_band->GetYSize();
         for (auto coord: {x, y}) {
             this->_block_cnt[coord] = (this->_size[coord] + _block_size[coord] - 1) / _block_size[coord];
@@ -185,21 +220,72 @@ void CreatePatches(
         }
     }
 
+    // Work in projection where units are meters.
     auto [project, unproject] = projection_for_lat_long(polygon_bounding_box.MinY, polygon_bounding_box.MinX);
 
+    // Transform the incoming multipolygon in place, not a copy.
     admin->transform(project.get());
+    // Use Boost Polygon because it lets us create things and intersect and delaunay them.
+    auto admin_bg = convert(admin);
 
-    using point = model::d2::point_xy<double>;
-    using polygon = model::polygon<point>;
     for (const auto& pixel_iter: settlement_pfpr) {
-        polygon pixel_poly;
-        auto bounds = pixel_bounds<point>(pixel_iter.first, settlement_geo_transform);
+        dpolygon pixel_poly;
+        // Apply the projection before making the new polygon.
+        auto bounds = pixel_bounds<dpoint>(pixel_iter.first, settlement_geo_transform);
         for (auto& bound: bounds) {
             double bx{get<0>(bound)};
             double by{get<1>(bound)};
             project->Transform(1, &bx, &by);
             boost::geometry::set<0>(bound, bx);
             boost::geometry::set<1>(bound, by);
+        }
+        append(pixel_poly, bounds);
+
+        // If the polygon is split by the side, get the centroid of the inner pieces
+        // and the centroid of the outer pieces. That's enough for making patches.
+        double intersect_area{0};
+        double total_area{area(pixel_poly)};
+        dpoint pix_centroid{0, 0};
+        centroid(pixel_poly, pix_centroid);
+        dpoint outside_centroid{pix_centroid};
+        dpoint total_centroid(pix_centroid);
+        bool does_overlap = overlaps(pixel_poly, admin_bg);
+        if (does_overlap) {
+            bool is_within = within(pixel_poly, admin_bg);
+            if (is_within) {
+                intersect_area = total_area;
+            } else {
+                deque<dpolygon> output;
+                intersection(pixel_poly, admin_bg, output);
+                double cx{0};
+                double cy{0};
+                for (const auto& geom: output) {
+                    double part_area = area(geom);
+                    intersect_area += part_area;
+                    dpoint part_centroid;
+                    centroid(geom, part_centroid);
+                    cx += bg::get<0>(part_centroid) * part_area;
+                    cy += bg::get<1>(part_centroid) * part_area;
+                }
+                bg::set<0>(pix_centroid, cx / intersect_area);
+                bg::set<1>(pix_centroid, cy / intersect_area);
+
+                if (total_area - intersect_area > 0.01 * total_area) {
+                    // The centroid of the outside can be computed from the total centroid and inside centroid.
+                    bg::set<0>(
+                            outside_centroid,
+                            (bg::get<0>(total_centroid) * total_area
+                             - bg::get<0>(pix_centroid) * intersect_area) / (total_area - intersect_area)
+                    );
+                    bg::set<1>(
+                            outside_centroid,
+                            (bg::get<1>(total_centroid) * total_area
+                             - bg::get<1>(pix_centroid) * intersect_area) / (total_area - intersect_area)
+                    );
+                }
+            }
+        } else {
+            intersect_area = 0;
         }
     }
 }

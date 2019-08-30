@@ -92,6 +92,7 @@ namespace spacepop {
 //    };
 //}
 
+const int X{0}, Y{1};
 
 //! Convert a lat-long into a specific pixel.
 std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform) {
@@ -213,17 +214,19 @@ private:
 };
 
 
-void CreatePatches(
-        OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* pfpr,
-        const std::vector<double>& settlement_geo_transform,
-        const std::vector<double>& pfpr_geo_transform
-        )
-{
-    const int x{0}, y{1};
+/*! Finds the minimum and maximum of a polygon within a particular projection transform.
+ *
+ * @param admin A OGRGeometry.
+ * @param settlement_geo_transform Describes how coordinates relate to pixels for GDAL projections.
+ * @return
+ */
+pair<array<int, 2>, array<int, 2>>
+gdal_geometry_min_max(OGRMultiPolygon* admin, const std::vector<double>& settlement_geo_transform) {
+
     OGREnvelope polygon_bounding_box;
     admin->getEnvelope(&polygon_bounding_box);
     std::cout << "polygon bbox ((" << polygon_bounding_box.MinX << ", " << polygon_bounding_box.MaxX << "), (("
-        << polygon_bounding_box.MinY << ", " << polygon_bounding_box.MaxY << "))" << std::endl;
+              << polygon_bounding_box.MinY << ", " << polygon_bounding_box.MaxY << "))" << std::endl;
 
     std::vector<std::array<int,2>> bounding_pixels;
     for (auto ex: {polygon_bounding_box.MinX, polygon_bounding_box.MaxX}) {
@@ -234,30 +237,39 @@ void CreatePatches(
     std::array<int,2> settlement_min{std::numeric_limits<int>::max(), std::numeric_limits<int>::max()};
     std::array<int,2> settlement_max{0, 0};
     for (auto bpix: bounding_pixels) {
-        for (auto mcoord: {x, y}) {
+        for (auto mcoord: {X, Y}) {
             settlement_min[mcoord] = std::min(settlement_min[mcoord], bpix[mcoord]);
             settlement_max[mcoord] = std::max(settlement_max[mcoord], bpix[mcoord]);
         }
     }
+    return {settlement_min, settlement_max};
+}
 
-    auto settlement_arr = OnDemandRaster(settlement, settlement_geo_transform);
-    auto pfpr_arr = OnDemandRaster(pfpr, pfpr_geo_transform);
 
-    enum class Overlap { in, out, on };
-    struct PixelData {
-        double pfpr;
-        double pop;
-        Overlap overlap;
-        dpoint centroid_in;
-        dpoint centroid_out;
-        double area_in;
-        double area_out;
-    };
+enum class Overlap { in, out, on };
+struct PixelData {
+    double pfpr;
+    double pop;
+    Overlap overlap;
+    dpoint centroid_in;
+    dpoint centroid_out;
+    double area_in;
+    double area_out;
+};
 
-    const double cutoff = 0.1;
+
+map<array<int, 2>,PixelData>
+sparse_settlements(
+        OnDemandRaster& settlement_arr,
+        OnDemandRaster& pfpr_arr,
+        const pair<array<int, 2>, array<int, 2>>& settlement_min_max,
+        const vector<double>& settlement_geo_transform,
+        const double cutoff
+        ) {
+    const auto& [settlement_min, settlement_max] = settlement_min_max;
     map<array<int, 2>,PixelData> settlement_pfpr;
-    for (int pixel_y=settlement_min[y]; pixel_y < settlement_max[y]; ++pixel_y) {
-        for (int pixel_x = settlement_min[x]; pixel_x < settlement_max[x]; ++pixel_x) {
+    for (int pixel_y=settlement_min[Y]; pixel_y < settlement_max[Y]; ++pixel_y) {
+        for (int pixel_x = settlement_min[X]; pixel_x < settlement_max[X]; ++pixel_x) {
             double pixel_pop = settlement_arr.at({pixel_x, pixel_y});
             if (pixel_pop > cutoff) {
                 auto settlement_coord = pixel_coord<array<double, 2>>({pixel_x, pixel_y}, settlement_geo_transform);
@@ -267,15 +279,16 @@ void CreatePatches(
             }
         }
     }
+    return settlement_pfpr;
+}
 
-    // Work in projection where units are meters.
-    auto [project, unproject] = projection_for_lat_long(polygon_bounding_box.MinY, polygon_bounding_box.MinX);
 
-    // Transform the incoming multipolygon in place, not a copy.
-    admin->transform(project.get());
-    // Use Boost Polygon because it lets us create things and intersect and delaunay them.
-    auto admin_bg = convert(admin);
-
+void split_patches_retaining_pfpr(
+        map<array<int, 2>,PixelData>& settlement_pfpr,
+        const vector<double>& settlement_geo_transform,
+        const dmpolygon& admin_bg,
+        shared_ptr<OGRCoordinateTransformation>& project
+        ) {
     for (auto& pixel_iter: settlement_pfpr) {
         dpolygon pixel_poly;
         // Apply the projection before making the new polygon.
@@ -352,7 +365,10 @@ void CreatePatches(
             pd.centroid_out = pix_centroid;
         }
     }
+}
 
+
+void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
     array<double, 2> bmin{numeric_limits<double>::max(), numeric_limits<double>::max()};
     array<double, 2> bmax{numeric_limits<double>::min(), numeric_limits<double>::min()};
     for (const auto& [bounds_p, data_p]: settlement_pfpr) {
@@ -406,6 +422,40 @@ void CreatePatches(
             ;
         }
     }
+}
+
+
+void CreatePatches(
+        OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* pfpr,
+        const std::vector<double>& settlement_geo_transform,
+        const std::vector<double>& pfpr_geo_transform
+        )
+{
+    const int x{0}, y{1};
+    auto settlement_min_max = gdal_geometry_min_max(admin, settlement_geo_transform);
+    auto settlement_arr = OnDemandRaster(settlement, settlement_geo_transform);
+    auto pfpr_arr = OnDemandRaster(pfpr, pfpr_geo_transform);
+
+
+    const double cutoff = 0.1;
+    map<array<int, 2>,PixelData> settlement_pfpr = sparse_settlements(
+            settlement_arr, pfpr_arr, settlement_min_max, settlement_geo_transform, cutoff
+            );
+
+    // Work in projection where units are meters.
+    OGREnvelope polygon_bounding_box;
+    admin->getEnvelope(&polygon_bounding_box);
+    auto [project, unproject] = projection_for_lat_long(polygon_bounding_box.MinY, polygon_bounding_box.MinX);
+
+    // Transform the incoming multipolygon in place, not a copy.
+    admin->transform(project.get());
+    // Use Boost Polygon because it lets us create things and intersect and delaunay them.
+    auto admin_bg = convert(admin);
+
+    split_patches_retaining_pfpr(settlement_pfpr, settlement_geo_transform, admin_bg, project);
+
+    // Should return a graph with an index into settlement_pfpr.
+    create_neighbor_graph(settlement_pfpr);
 
     // Cluster on the graph, excluding nodes that are outside the polygon.
 }

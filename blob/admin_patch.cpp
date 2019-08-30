@@ -2,15 +2,61 @@
 #include <deque>
 #include <iostream>
 
-#include <boost/geometry.hpp>
-#include <boost/geometry/geometries/point_xy.hpp>
-#include <boost/geometry/geometries/polygon.hpp>
+#include "boost/geometry.hpp"
+#include "boost/geometry/geometries/point_xy.hpp"
+#include "boost/geometry/geometries/polygon.hpp"
+#include "boost/geometry/geometries/segment.hpp"
+#include "boost/polygon/voronoi.hpp"
+#include "boost/polygon/polygon.hpp"
 
 #include "admin_patch.h"
 #include "projection.h"
 
 using namespace boost::geometry;
 using namespace std;
+
+namespace bg = boost::geometry;
+using dpoint = model::d2::point_xy<double>;
+using dpolygon = model::polygon<dpoint>;
+using dmpolygon = model::multi_polygon<dpolygon>;
+
+using ipoint = model::d2::point_xy<int>;
+using isegment = model::segment<ipoint>;
+
+using boost::polygon::voronoi_builder;
+using boost::polygon::voronoi_diagram;
+
+namespace boost::polygon {
+
+    template <>
+    struct geometry_concept<ipoint> { typedef point_concept type; };
+
+    template <>
+    struct point_traits<ipoint> {
+        typedef int coordinate_type;
+
+        static inline coordinate_type get(const ipoint& point, orientation_2d orient) {
+            return (orient == HORIZONTAL) ? bg::get<0>(point) : bg::get<1>(point);
+        }
+    };
+
+    template <>
+    struct geometry_concept<isegment> { typedef segment_concept type; };
+
+    template <>
+    struct segment_traits<isegment> {
+        typedef int coordinate_type;
+        typedef ipoint point_type;
+
+        static inline point_type get(const isegment& segment, direction_1d dir) {
+            if (dir.to_int()) {
+                return {bg::get<1, 0>(segment), bg::get<1, 1>(segment)};
+            } else {
+                return {bg::get<0,0>(segment), bg::get<0,1>(segment)};
+            }
+        }
+    };
+}
 
 namespace spacepop {
 // These templates convince boost::geometry to treat
@@ -46,10 +92,6 @@ namespace spacepop {
 //    };
 //}
 
-namespace bg = boost::geometry;
-using dpoint = model::d2::point_xy<double>;
-using dpolygon = model::polygon<dpoint>;
-using dmpolygon = model::multi_polygon<dpolygon>;
 
 //! Convert a lat-long into a specific pixel.
 std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform) {
@@ -201,9 +243,15 @@ void CreatePatches(
     auto settlement_arr = OnDemandRaster(settlement, settlement_geo_transform);
     auto pfpr_arr = OnDemandRaster(pfpr, pfpr_geo_transform);
 
+    enum class Overlap { in, out, on };
     struct PixelData {
         double pfpr;
         double pop;
+        Overlap overlap;
+        dpoint centroid_in;
+        dpoint centroid_out;
+        double area_in;
+        double area_out;
     };
 
     const double cutoff = 0.1;
@@ -228,7 +276,7 @@ void CreatePatches(
     // Use Boost Polygon because it lets us create things and intersect and delaunay them.
     auto admin_bg = convert(admin);
 
-    for (const auto& pixel_iter: settlement_pfpr) {
+    for (auto& pixel_iter: settlement_pfpr) {
         dpolygon pixel_poly;
         // Apply the projection before making the new polygon.
         auto bounds = pixel_bounds<dpoint>(pixel_iter.first, settlement_geo_transform);
@@ -243,6 +291,8 @@ void CreatePatches(
 
         // If the polygon is split by the side, get the centroid of the inner pieces
         // and the centroid of the outer pieces. That's enough for making patches.
+        PixelData& pd{pixel_iter.second};
+
         double intersect_area{0};
         double total_area{area(pixel_poly)};
         dpoint pix_centroid{0, 0};
@@ -253,7 +303,9 @@ void CreatePatches(
         if (does_overlap) {
             bool is_within = within(pixel_poly, admin_bg);
             if (is_within) {
-                intersect_area = total_area;
+                pd.overlap = Overlap::in;
+                pd.area_in = total_area;
+                pd.centroid_in = pix_centroid;
             } else {
                 deque<dpolygon> output;
                 intersection(pixel_poly, admin_bg, output);
@@ -282,12 +334,80 @@ void CreatePatches(
                             (bg::get<1>(total_centroid) * total_area
                              - bg::get<1>(pix_centroid) * intersect_area) / (total_area - intersect_area)
                     );
+                    pd.overlap = Overlap::on;
+                    pd.area_in = intersect_area;
+                    pd.centroid_in = pix_centroid;
+                    pd.area_out = total_area - intersect_area;
+                    pd.centroid_out = outside_centroid;
+                } else {
+                    pd.overlap = Overlap::in;
+                    pd.area_in = total_area;
+                    pd.centroid_in = pix_centroid;
                 }
             }
         } else {
             intersect_area = 0;
+            pd.overlap = Overlap::out;
+            pd.area_out = total_area;
+            pd.centroid_out = pix_centroid;
         }
     }
+
+    array<double, 2> bmin{numeric_limits<double>::max(), numeric_limits<double>::max()};
+    array<double, 2> bmax{numeric_limits<double>::min(), numeric_limits<double>::min()};
+    for (const auto& [bounds_p, data_p]: settlement_pfpr) {
+        if (data_p.overlap == Overlap::in || data_p.overlap == Overlap::on) {
+            auto cpx = data_p.centroid_in.get<0>();
+            bmin[0] = min(cpx, bmin[0]);
+            bmax[0] = min(cpx, bmax[0]);
+            auto cpy = data_p.centroid_in.get<1>();
+            bmin[1] = min(cpx, bmin[1]);
+            bmax[1] = min(cpx, bmax[1]);
+        }
+        if (data_p.overlap == Overlap::out || data_p.overlap == Overlap::on) {
+            auto cpx = data_p.centroid_out.get<0>();
+            bmin[0] = min(cpx, bmin[0]);
+            bmax[0] = min(cpx, bmax[0]);
+            auto cpy = data_p.centroid_out.get<1>();
+            bmin[1] = min(cpx, bmin[1]);
+            bmax[1] = min(cpx, bmax[1]);
+        }
+    }
+    array<double, 2> scale = { (1<<30) / (bmax[0] - bmin[0]), (1<<30) / (bmax[1] - bmin[1])};
+
+    std::vector<ipoint> points;
+    for (const auto& [pix_key, sd]: settlement_pfpr) {
+        if (sd.overlap == Overlap::in || sd.overlap == Overlap::on) {
+            auto cpx = sd.centroid_in.get<0>();
+            auto cpy = sd.centroid_in.get<1>();
+            points.emplace_back(ipoint{
+                    static_cast<int>(lround((cpx - bmin[0]) * scale[0])),
+                    static_cast<int>(lround((cpy - bmin[1]) * scale[1]))
+            });
+        }
+        if (sd.overlap == Overlap::out || sd.overlap == Overlap::on) {
+            auto cpx = sd.centroid_out.get<0>();
+            auto cpy = sd.centroid_out.get<1>();
+            points.emplace_back(ipoint{
+                    static_cast<int>(lround((cpx - bmin[0]) * scale[0])),
+                    static_cast<int>(lround((cpy - bmin[1]) * scale[1]))
+            });
+        }
+    }
+    std::vector<isegment> segments;
+    voronoi_diagram<double> vd;
+    construct_voronoi(points.begin(), points.end(), segments.begin(), segments.end(), &vd);
+
+    // Make a graph
+
+    // Walk edges to turn them into graph links.
+    for (auto edge_iter = vd.edges().begin(); edge_iter != vd.edges().end(); ++edge_iter) {
+        if (edge_iter->is_primary()) {
+            ;
+        }
+    }
+
+    // Cluster on the graph, excluding nodes that are outside the polygon.
 }
 
 }

@@ -10,6 +10,8 @@
 #include "boost/polygon/polygon.hpp"
 
 #include "admin_patch.h"
+#include "gdal_raster.h"
+#include "on_demand_raster.h"
 #include "projection.h"
 
 using namespace boost::geometry;
@@ -94,36 +96,6 @@ namespace spacepop {
 
 const int X{0}, Y{1};
 
-//! Convert a lat-long into a specific pixel.
-std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform) {
-    return {
-            static_cast<int>(std::lround(std::floor((1 / transform[1]) * (coord[0] - transform[0])))),
-            static_cast<int>(std::lround(std::floor((1 / transform[5]) * (coord[1] - transform[3]))))
-    };
-}
-
-//! Convert a pixel corner into a lat-long
-template<typename POINTISH>
-POINTISH pixel_coord(std::array<int, 2> pixel, const std::vector<double>& transform) {
-    return {
-        transform[0] + pixel[0] * transform[1] + pixel[1] * transform[2],
-        transform[3] + pixel[1] * transform[4] + pixel[5]
-    };
-}
-
-
-//! Convert a pixel into its four corners as lat-long.
-//  Boost::polygon likes to be clockwise, so these are clockwise.
-template<typename POINTISH>
-std::vector<POINTISH> pixel_bounds(std::array<int, 2> pixel, const std::vector<double>& transform) {
-    return {
-        pixel_coord<POINTISH>(pixel, transform),
-        pixel_coord<POINTISH>({pixel[0], pixel[1] + 1}, transform),
-        pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
-        pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform)
-    };
-}
-
 
 /*! Convert a GDAL OGRMultiPolygon into a Boost multi_polygon
  *
@@ -152,66 +124,6 @@ dmpolygon convert(OGRMultiPolygon const* gdal_poly) {
     }
     return dpoly;
 }
-
-
-/*! Read GDAL Raster data set block-by-block, as pixels are requested.
- *  GDAL has a least-recently-used cache. This asks for the blocks it
- *  needs when it needs them. It doesn't throw out any blocks because there
- *  is LRU underneath.
- */
-class OnDemandRaster
-{
-    const int x{0}, y{1};  // To make notation clearer.
-
-    GDALRasterBand* _band;
-    const std::vector<double>& _transform;
-    std::map<std::array<int,2>,std::vector<double>> _buffer;
-public:
-    OnDemandRaster(GDALRasterBand* band, const std::vector<double>& geo_transform)
-    : _band(band), _transform(geo_transform) {
-        this->_band->GetBlockSize(&_block_size[x], &_block_size[y]);
-        this->_size[x] = this->_band->GetXSize();  // Track long, lat vs lat, long.
-        this->_size[y] = this->_band->GetYSize();
-        for (auto coord: {x, y}) {
-            this->_block_cnt[coord] = (this->_size[coord] + _block_size[coord] - 1) / _block_size[coord];
-        }
-    }
-    double at_coord(double lat_coord, double long_coord) {
-        auto ix = pixel_containing({lat_coord, long_coord}, this->_transform);
-        return this->at(ix);
-    }
-
-    double at(std::array<int, 2> ix) {
-        for (auto check_bounds: {x, y}) {
-            if (ix[check_bounds] < 0 || ix[check_bounds] >= this->_size[check_bounds]) {
-                std::cout << "Out of bounds for raster (" << ix[x] << ", " << ix[y] << ")" << std::endl;
-                return 0.0;
-            }
-        }
-        std::array<int, 2> block{0, 0};
-        for (auto bidx: {x, y}) {
-            block[bidx] = ix[bidx] / this->_block_size[bidx];
-        }
-        auto buffer = this->_buffer.find(block);
-        if (buffer == this->_buffer.end()) {
-            auto buffer_cnt = this->_block_size[x] * this->_block_size[y];
-            auto insert = this->_buffer.emplace(block, std::vector<double>(buffer_cnt));
-            buffer = insert.first;
-            auto read_succeed = this->_band->ReadBlock(block[x], block[y], &buffer->second);
-            if (read_succeed != CE_None) {
-                std::cout << "Could not read block (" << block[x] << ", " << block[y] << ")" << std::endl;
-            }
-        }
-        return (buffer->second[
-                    ix[x] - _block_size[x] * block[x] +
-                    _block_size[x] * (ix[y] - _block_size[y] * block[y])
-                    ]);
-    }
-private:
-    std::array<int,2> _size;  // Total pixels in raster as x, y
-    std::array<int,2> _block_size;  // Size of each raster block.
-    std::array<int,2> _block_cnt;  // Number of raster blocks in x and y.
-};
 
 
 /*! Finds the minimum and maximum of a polygon within a particular projection transform.

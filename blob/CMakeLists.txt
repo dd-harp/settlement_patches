@@ -79,7 +79,8 @@ find_library(
 
 add_executable(blob main.cpp read_tiff.h connected_settlements.h pixel.h simple_patches.h
         shapefile.h gdal_raster.h gdal_raster.cpp gdal_vector.h simple_patches_test.cpp
-        gdal_vector.cpp projection.h projection.cpp admin_patch.h admin_patch.cpp)
+        gdal_vector.cpp projection.h projection.cpp admin_patch.h admin_patch.cpp
+        on_demand_raster.h on_demand_raster.cpp)
 add_to_cached_list(CGAL_EXECUTABLE_TARGETS blob )
 
 # Link the executable to CGAL and third-party libraries
@@ -95,7 +96,8 @@ target_link_libraries(
 
 # Make a second executable that runs the tests.
 add_executable(blob_test test_main.cpp cgal_tutorial.cpp simple_patches_test.cpp simple_patches.h
-        admin_patch_test.cpp admin_patch.cpp admin_patch.h projection.h projection.cpp)
+        admin_patch_test.cpp admin_patch.cpp admin_patch.h projection.h projection.cpp gdal_raster.cpp
+        on_demand_raster.h on_demand_raster.cpp)
 target_link_libraries(
         blob_test
         ${CGAL_LIBRARIES}

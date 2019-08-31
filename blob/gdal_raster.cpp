@@ -67,4 +67,12 @@ namespace spacepop {
         }
         return shared_ptr<GDALDataset>(dataset, DatasetClose());
     }
+
+    std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform) {
+        return {
+                static_cast<int>(std::lround(std::floor((1 / transform[1]) * (coord[0] - transform[0])))),
+                static_cast<int>(std::lround(std::floor((1 / transform[5]) * (coord[1] - transform[3]))))
+        };
+    }
+
 }

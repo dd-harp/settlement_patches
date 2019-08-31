@@ -13,6 +13,8 @@
 #include "gdal_raster.h"
 #include "on_demand_raster.h"
 #include "projection.h"
+#include "split_patches.h"
+#include "sparse_settlements.h"
 
 using namespace boost::geometry;
 using namespace std;
@@ -97,189 +99,6 @@ namespace spacepop {
 const int X{0}, Y{1};
 
 
-/*! Convert a GDAL OGRMultiPolygon into a Boost multi_polygon
- *
- * @param gdal_poly Reads but does not write this.
- * @return Boost multi_polygon
- */
-dmpolygon convert(OGRMultiPolygon const* gdal_poly) {
-    dmpolygon dpoly;
-    dpoly.resize(gdal_poly->getNumGeometries());
-    int poly_idx{0};
-    for (const auto& child_poly: gdal_poly) {
-        dpolygon& single{dpoly[poly_idx]};
-        OGRLinearRing const* exterior = child_poly->getExteriorRing();
-        bool outer_clock = exterior->isClockwise();  // XXX track clockwise or CCW
-        for (const auto& gd_pt: exterior) {
-            append(single.outer(), dpoint{gd_pt.getX(), gd_pt.getY()});
-        }
-        single.inners().resize(child_poly->getNumInteriorRings());
-        for (int inner=0; inner < child_poly->getNumInteriorRings(); ++inner) {
-            OGRLinearRing const* interior = child_poly->getInteriorRing(inner);
-            for (const auto& in_pt: interior) {
-                append(single.inners()[inner], dpoint{in_pt.getX(), in_pt.getY()});
-            }
-        }
-        ++poly_idx;
-    }
-    return dpoly;
-}
-
-
-/*! Finds the minimum and maximum of a polygon within a particular projection transform.
- *
- * @param admin A OGRGeometry.
- * @param settlement_geo_transform Describes how coordinates relate to pixels for GDAL projections.
- * @return
- */
-pair<array<int, 2>, array<int, 2>>
-gdal_geometry_min_max(OGRMultiPolygon* admin, const std::vector<double>& settlement_geo_transform) {
-
-    OGREnvelope polygon_bounding_box;
-    admin->getEnvelope(&polygon_bounding_box);
-    std::cout << "polygon bbox ((" << polygon_bounding_box.MinX << ", " << polygon_bounding_box.MaxX << "), (("
-              << polygon_bounding_box.MinY << ", " << polygon_bounding_box.MaxY << "))" << std::endl;
-
-    std::vector<std::array<int,2>> bounding_pixels;
-    for (auto ex: {polygon_bounding_box.MinX, polygon_bounding_box.MaxX}) {
-        for (auto ey: {polygon_bounding_box.MinY, polygon_bounding_box.MaxY}) {
-            bounding_pixels.push_back(pixel_containing({ex, ey}, settlement_geo_transform));
-        }
-    }
-    std::array<int,2> settlement_min{std::numeric_limits<int>::max(), std::numeric_limits<int>::max()};
-    std::array<int,2> settlement_max{0, 0};
-    for (auto bpix: bounding_pixels) {
-        for (auto mcoord: {X, Y}) {
-            settlement_min[mcoord] = std::min(settlement_min[mcoord], bpix[mcoord]);
-            settlement_max[mcoord] = std::max(settlement_max[mcoord], bpix[mcoord]);
-        }
-    }
-    return {settlement_min, settlement_max};
-}
-
-
-enum class Overlap { in, out, on };
-struct PixelData {
-    double pfpr;
-    double pop;
-    Overlap overlap;
-    dpoint centroid_in;
-    dpoint centroid_out;
-    double area_in;
-    double area_out;
-};
-
-
-map<array<int, 2>,PixelData>
-sparse_settlements(
-        OnDemandRaster& settlement_arr,
-        OnDemandRaster& pfpr_arr,
-        const pair<array<int, 2>, array<int, 2>>& settlement_min_max,
-        const vector<double>& settlement_geo_transform,
-        const double cutoff
-        ) {
-    const auto& [settlement_min, settlement_max] = settlement_min_max;
-    map<array<int, 2>,PixelData> settlement_pfpr;
-    for (int pixel_y=settlement_min[Y]; pixel_y < settlement_max[Y]; ++pixel_y) {
-        for (int pixel_x = settlement_min[X]; pixel_x < settlement_max[X]; ++pixel_x) {
-            double pixel_pop = settlement_arr.at({pixel_x, pixel_y});
-            if (pixel_pop > cutoff) {
-                auto settlement_coord = pixel_coord<array<double, 2>>({pixel_x, pixel_y}, settlement_geo_transform);
-                PixelData pd{pfpr_arr.at_coord(pixel_x, pixel_y), pixel_pop};
-                array<int, 2> create_pixel{pixel_x, pixel_y};
-                settlement_pfpr.insert(make_pair(create_pixel, pd));
-            }
-        }
-    }
-    return settlement_pfpr;
-}
-
-
-void split_patches_retaining_pfpr(
-        map<array<int, 2>,PixelData>& settlement_pfpr,
-        const vector<double>& settlement_geo_transform,
-        const dmpolygon& admin_bg,
-        shared_ptr<OGRCoordinateTransformation>& project
-        ) {
-    for (auto& pixel_iter: settlement_pfpr) {
-        dpolygon pixel_poly;
-        // Apply the projection before making the new polygon.
-        auto bounds = pixel_bounds<dpoint>(pixel_iter.first, settlement_geo_transform);
-        for (auto& bound: bounds) {
-            double bx{get<0>(bound)};
-            double by{get<1>(bound)};
-            project->Transform(1, &bx, &by);
-            boost::geometry::set<0>(bound, bx);
-            boost::geometry::set<1>(bound, by);
-        }
-        append(pixel_poly, bounds);
-
-        // If the polygon is split by the side, get the centroid of the inner pieces
-        // and the centroid of the outer pieces. That's enough for making patches.
-        PixelData& pd{pixel_iter.second};
-
-        double intersect_area{0};
-        double total_area{area(pixel_poly)};
-        dpoint pix_centroid{0, 0};
-        centroid(pixel_poly, pix_centroid);
-        dpoint outside_centroid{pix_centroid};
-        dpoint total_centroid(pix_centroid);
-        bool does_overlap = overlaps(pixel_poly, admin_bg);
-        if (does_overlap) {
-            bool is_within = within(pixel_poly, admin_bg);
-            if (is_within) {
-                pd.overlap = Overlap::in;
-                pd.area_in = total_area;
-                pd.centroid_in = pix_centroid;
-            } else {
-                deque<dpolygon> output;
-                intersection(pixel_poly, admin_bg, output);
-                double cx{0};
-                double cy{0};
-                for (const auto& geom: output) {
-                    double part_area = area(geom);
-                    intersect_area += part_area;
-                    dpoint part_centroid;
-                    centroid(geom, part_centroid);
-                    cx += bg::get<0>(part_centroid) * part_area;
-                    cy += bg::get<1>(part_centroid) * part_area;
-                }
-                bg::set<0>(pix_centroid, cx / intersect_area);
-                bg::set<1>(pix_centroid, cy / intersect_area);
-
-                if (total_area - intersect_area > 0.01 * total_area) {
-                    // The centroid of the outside can be computed from the total centroid and inside centroid.
-                    bg::set<0>(
-                            outside_centroid,
-                            (bg::get<0>(total_centroid) * total_area
-                             - bg::get<0>(pix_centroid) * intersect_area) / (total_area - intersect_area)
-                    );
-                    bg::set<1>(
-                            outside_centroid,
-                            (bg::get<1>(total_centroid) * total_area
-                             - bg::get<1>(pix_centroid) * intersect_area) / (total_area - intersect_area)
-                    );
-                    pd.overlap = Overlap::on;
-                    pd.area_in = intersect_area;
-                    pd.centroid_in = pix_centroid;
-                    pd.area_out = total_area - intersect_area;
-                    pd.centroid_out = outside_centroid;
-                } else {
-                    pd.overlap = Overlap::in;
-                    pd.area_in = total_area;
-                    pd.centroid_in = pix_centroid;
-                }
-            }
-        } else {
-            intersect_area = 0;
-            pd.overlap = Overlap::out;
-            pd.area_out = total_area;
-            pd.centroid_out = pix_centroid;
-        }
-    }
-}
-
-
 void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
     array<double, 2> bmin{numeric_limits<double>::max(), numeric_limits<double>::max()};
     array<double, 2> bmax{numeric_limits<double>::min(), numeric_limits<double>::min()};
@@ -344,14 +163,12 @@ void CreatePatches(
         )
 {
     const int x{0}, y{1};
-    auto settlement_min_max = gdal_geometry_min_max(admin, settlement_geo_transform);
     auto settlement_arr = OnDemandRaster(settlement, settlement_geo_transform);
     auto pfpr_arr = OnDemandRaster(pfpr, pfpr_geo_transform);
 
-
     const double cutoff = 0.1;
     map<array<int, 2>,PixelData> settlement_pfpr = sparse_settlements(
-            settlement_arr, pfpr_arr, settlement_min_max, settlement_geo_transform, cutoff
+            settlement_arr, pfpr_arr, admin, settlement_geo_transform, cutoff
             );
 
     // Work in projection where units are meters.

@@ -157,20 +157,10 @@ void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
 
 
 void CreatePatches(
-        OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* pfpr,
-        const std::vector<double>& settlement_geo_transform,
-        const std::vector<double>& pfpr_geo_transform
+        OGRMultiPolygon* admin, map<array<int, 2>,PixelData>& settlement_pfpr,
+        const std::vector<double>& settlement_geo_transform
         )
 {
-    const int x{0}, y{1};
-    auto settlement_arr = OnDemandRaster(settlement, settlement_geo_transform);
-    auto pfpr_arr = OnDemandRaster(pfpr, pfpr_geo_transform);
-
-    const double cutoff = 0.1;
-    map<array<int, 2>,PixelData> settlement_pfpr = sparse_settlements(
-            settlement_arr, pfpr_arr, admin, settlement_geo_transform, cutoff
-            );
-
     // Work in projection where units are meters.
     OGREnvelope polygon_bounding_box;
     admin->getEnvelope(&polygon_bounding_box);

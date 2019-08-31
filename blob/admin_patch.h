@@ -1,11 +1,17 @@
 #ifndef BLOB_ADMIN_PATCH_H
 #define BLOB_ADMIN_PATCH_H
 
+#include <array>
+#include <map>
+#include <vector>
+
 #include "gdal/gdal_priv.h"
 
+class OGRMultiPolygon;
 
 namespace spacepop
 {
+    class PixelData;
     /*! Given an admin unit, create patches from the settlement layer.
      *
      * @param admin The admin unit, as a multi polygon, even if it's just one polygon.
@@ -22,9 +28,8 @@ namespace spacepop
      * @param pfpr_geo_transform Also a transformation from (P,L) to (Xp, Yp).
      */
     void CreatePatches(
-            OGRMultiPolygon* admin, GDALRasterBand* settlement, GDALRasterBand* PfPR,
-            const std::vector<double>& settlement_geo_transform,
-            const std::vector<double>& pfpr_geo_transform
+            OGRMultiPolygon* admin, std::map<std::array<int, 2>,PixelData>& settlement_pfpr,
+            const std::vector<double>& settlement_geo_transform
             );
 }
 

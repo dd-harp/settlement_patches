@@ -3,17 +3,18 @@
 
 #include <array>
 #include <exception>
-#include <filesystem>
 #include <sstream>
 #include <vector>
 
+#include "boost/filesystem.hpp"
 #include "CGAL/Exact_predicates_inexact_constructions_kernel.h"
+
 #include "gdal/gdal_priv.h"
 #include "gdal/cpl_conv.h"
 
 
 namespace spacepop {
-    std::shared_ptr<GDALDataset>  OpenGeoTiff(const std::filesystem::path& tiff_file);
+    std::shared_ptr<GDALDataset>  OpenGeoTiff(const boost::filesystem::path& tiff_file);
 
     template<typename PointOutputIterator>
     void gdal_raster_points(PointOutputIterator out, GDALRasterBand *band, double cutoff, int corner = 0) {

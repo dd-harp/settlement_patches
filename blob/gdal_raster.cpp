@@ -4,7 +4,7 @@
 #include "gdal_raster.h"
 
 using namespace std;
-namespace fs = std::filesystem;
+namespace fs = boost::filesystem;
 
 namespace spacepop {
 
@@ -14,7 +14,7 @@ namespace spacepop {
         }
     };
 
-    shared_ptr<GDALDataset> OpenGeoTiff(const std::filesystem::path &geotiff_filename) {
+    shared_ptr<GDALDataset> OpenGeoTiff(const boost::filesystem::path &geotiff_filename) {
 
         auto parent_directory = geotiff_filename.parent_path();
         auto file_stem = geotiff_filename.stem().string();

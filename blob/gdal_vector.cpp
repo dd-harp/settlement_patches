@@ -7,7 +7,7 @@
 
 
 using namespace std;
-namespace fs = std::filesystem;
+namespace fs = boost::filesystem;
 
 namespace spacepop {
     void print_layer_features(OGRLayer *layer) {
@@ -74,7 +74,7 @@ namespace spacepop {
         }
     }
 
-    void OpenShapefile(const std::filesystem::path &shapefile_path)
+    void OpenShapefile(const boost::filesystem::path &shapefile_path)
     {
         auto dataset = static_cast<GDALDataset *>(GDALOpenEx(
                 shapefile_path.c_str(),
@@ -102,7 +102,7 @@ namespace spacepop {
     }
 
 
-    void WriteVector(const std::filesystem::path &shape_filename) {
+    void WriteVector(const boost::filesystem::path &shape_filename) {
         // https://gdal.org/tutorials/vector_api_tut.html#writing-to-ogr
         GDALDriver *shapefile_driver = GetGDALDriverManager()->GetDriverByName("GTiff");
         if (shapefile_driver == nullptr) {

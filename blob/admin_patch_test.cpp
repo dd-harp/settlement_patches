@@ -8,5 +8,5 @@ using namespace spacepop;
 
 
 TEST(CreatePatches, BasicCall) {
-    OGRPolygon polygon;
+    // OGRPolygon polygon;
 }

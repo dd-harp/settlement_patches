@@ -90,7 +90,7 @@ target_link_libraries(
         ${CGAL_3RD_PARTY_LIBRARIES}
         ${GeographicLib_LIBRARIES}
         geotiff tiff gdal
-        stdc++fs boost_program_options
+        boost_system boost_program_options boost_filesystem
         gtest_main
 )
 
@@ -103,7 +103,7 @@ target_link_libraries(
         ${CGAL_LIBRARIES}
         ${CGAL_3RD_PARTY_LIBRARIES}
         geotiff tiff gdal
-        stdc++fs boost_program_options
+        boost_system boost_program_options boost_filesystem
         gtest_main
 )
 

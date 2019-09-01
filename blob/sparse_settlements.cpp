@@ -1,6 +1,8 @@
 #include <iostream>
 
 #include "gdal/gdal_priv.h"
+#include "gdal/ogr_geometry.h"
+#include "gdal/ogr_spatialref.h"
 
 #include "gdal_raster.h"
 #include "on_demand_raster.h"

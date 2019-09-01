@@ -8,6 +8,7 @@
 #include "boost/geometry/geometries/segment.hpp"
 #include "boost/polygon/voronoi.hpp"
 #include "boost/polygon/polygon.hpp"
+#include "gdal/ogr_geometry.h"
 
 #include "admin_patch.h"
 #include "gdal_raster.h"

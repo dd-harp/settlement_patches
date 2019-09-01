@@ -1,6 +1,6 @@
 
-#include <filesystem>
 #include <iostream>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
 #include "gdal/gdal_priv.h"
@@ -16,7 +16,7 @@
 
 using namespace spacepop;
 using namespace std;
-namespace fs = std::filesystem;
+namespace fs = boost::filesystem;
 namespace po = boost::program_options;
 
 /* An Alpha_shape_2 is a Delaunay_triangulation_2 which is a Triangulation_2.

@@ -2,13 +2,14 @@
 #define BLOB_GDAL_VECTOR_H
 
 #include <exception>
-#include <filesystem>
+
+#include "boost/filesystem.hpp"
 
 #include "gdal/gdal_priv.h"
 
 namespace spacepop {
-    void OpenShapefile(const std::filesystem::path &shapefile_path);
-    void WriteVector(const std::filesystem::path &shape_filename);
+    void OpenShapefile(const boost::filesystem::path &shapefile_path);
+    void WriteVector(const boost::filesystem::path &shape_filename);
 }
 
 #endif //BLOB_GDAL_VECTOR_H

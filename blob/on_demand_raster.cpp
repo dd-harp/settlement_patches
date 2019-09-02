@@ -42,16 +42,16 @@ double OnDemandRaster::at(std::array<int, 2> ix) {
         auto buffer_cnt = this->_block_size[_X] * this->_block_size[_Y];
         auto insert = this->_buffer.emplace(block, std::vector<double>(buffer_cnt));
         buffer = insert.first;
-        auto read_succeed = this->_band->ReadBlock(block[_X], block[_Y], &buffer->second);
+        auto read_succeed = this->_band->ReadBlock(block[_X], block[_Y], &buffer->second[0]);
         if (read_succeed != CPLErr::CE_None) {
             std::stringstream err{"Could not read block ("};
             err << block[_X] << ", " << block[_Y] << ")";
             throw std::runtime_error(err.str());
         }
     }
-    return (buffer->second[
+    return (buffer->second.at(
             ix[_X] - _block_size[_X] * block[_X] +
             _block_size[_X] * (ix[_Y] - _block_size[_Y] * block[_Y])
-    ]);
+    ));
 }
 }

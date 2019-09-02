@@ -80,7 +80,9 @@ void assert_x_is_longitude(const OGRMultiPolygon * geometry) {
 
 // Reads a list of points and returns a list of segments
 // corresponding to the Alpha shape.
-int main(int argc, char* argv[]) {
+
+int entry(int argc, char* argv[])
+{
     ios_base::sync_with_stdio(false);
     map<string,fs::path> input_path = {
             {"settlement", "/home/adolgert/dev/spacepop/data/hrsl/hrsl_uga_pop.tif"},
@@ -216,4 +218,18 @@ int main(int argc, char* argv[]) {
 //    double cost_distance = 1.0;
 //    PolylineComponents(pixel_sets, alpha, cost_distance, scan_length);
 //    return 0;
+}
+
+int main(int argc, char* argv[])
+{
+    int retval{0};
+    try {
+        retval = entry(argc, argv);
+    } catch (const std::exception& exc) {
+        cout << exc.what() << endl;
+        retval = 1;
+    } catch (...) {
+        cout << "unknown exception" << endl;
+    }
+    return retval;
 }

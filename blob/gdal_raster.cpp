@@ -6,7 +6,7 @@
 using namespace std;
 namespace fs = boost::filesystem;
 
-namespace spacepop {
+namespace dd_harp {
 
     struct DatasetClose {
         void operator()(GDALDataset* ds) const {

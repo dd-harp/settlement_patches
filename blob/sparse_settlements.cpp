@@ -10,7 +10,7 @@
 
 using namespace std;
 
-namespace spacepop {
+namespace dd_harp {
 
     const int X{0}, Y{1};
 

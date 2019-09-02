@@ -11,7 +11,7 @@ class OGRMultiPolygon;
 class OGRCoordinateTransformation;
 
 
-namespace spacepop {
+namespace dd_harp {
 
     class PixelData;
 /*! Convert a GDAL OGRMultiPolygon into a Boost multi_polygon

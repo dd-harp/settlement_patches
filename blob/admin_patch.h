@@ -9,7 +9,7 @@
 
 class OGRMultiPolygon;
 
-namespace spacepop
+namespace dd_harp
 {
     class PixelData;
     /*! Given an admin unit, create patches from the settlement layer.

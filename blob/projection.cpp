@@ -7,7 +7,7 @@
 
 using namespace std;
 
-namespace spacepop {
+namespace dd_harp {
 
     struct CoordinateTransformClose {
         void operator()(OGRCoordinateTransformation* ct) const {

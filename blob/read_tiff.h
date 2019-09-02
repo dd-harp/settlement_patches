@@ -3,7 +3,7 @@
 
 #include <CGAL/Cartesian/Cartesian_base.h>
 
-namespace spacepop {
+namespace dd_harp {
 
 template<typename TIFFTYPE>
 std::vector<uint32> ImageSizes(TIFFTYPE* tif) {

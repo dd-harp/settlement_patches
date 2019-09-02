@@ -95,9 +95,12 @@ target_link_libraries(
 )
 
 # Make a second executable that runs the tests.
-add_executable(blob_test test_main.cpp cgal_tutorial.cpp simple_patches_test.cpp simple_patches.h
-        admin_patch_test.cpp admin_patch.cpp admin_patch.h projection.h projection.cpp gdal_raster.cpp
-        on_demand_raster.h on_demand_raster.cpp sparse_settlements.cpp sparse_settlements.h split_patches.h split_patches.cpp)
+add_executable(blob_test test_main.cpp cgal_tutorial.cpp simple_patches_test.cpp
+        simple_patches.h admin_patch_test.cpp admin_patch.cpp admin_patch.h
+        projection.h projection.cpp gdal_raster.cpp
+        on_demand_raster.h on_demand_raster.cpp sparse_settlements.cpp
+        sparse_settlements.h split_patches.h split_patches.cpp
+        sparse_settlements_test.cpp gdal_raster_test.cpp)
 target_link_libraries(
         blob_test
         ${CGAL_LIBRARIES}

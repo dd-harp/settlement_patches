@@ -9,7 +9,7 @@
 using namespace std;
 namespace fs = boost::filesystem;
 
-namespace spacepop {
+namespace dd_harp {
     void print_layer_features(OGRLayer *layer) {
         for (auto& feature: layer) {
             bool comma{false};

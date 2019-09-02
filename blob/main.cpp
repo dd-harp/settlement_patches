@@ -14,7 +14,7 @@
 #include "sparse_settlements.h"
 
 
-using namespace spacepop;
+using namespace dd_harp;
 using namespace std;
 namespace fs = boost::filesystem;
 namespace po = boost::program_options;
@@ -66,6 +66,18 @@ bool read_paths_from_command_line_args(po::variables_map& vm, map<string,fs::pat
 }
 
 
+/*! A sanity check for longitude and latitude.
+ *  Uganda is near longitude=33, latitude=2
+ */
+void assert_x_is_longitude(const OGRMultiPolygon * geometry) {
+    OGREnvelope bounds;
+    geometry->getEnvelope(&bounds);
+    if (bounds.MinX < 10 || bounds.MinY > 10) {
+        throw std::runtime_error("Polygon X is not longitude for Uganda.");
+    }
+}
+
+
 // Reads a list of points and returns a list of segments
 // corresponding to the Alpha shape.
 int main(int argc, char* argv[]) {
@@ -109,6 +121,12 @@ int main(int argc, char* argv[]) {
     if (settlement_dataset->GetGeoTransform(&settlement_geo_transform[0]) != CE_None) {
         cout << "Could not get settlement transform" << endl;
         return 9;
+    } else {
+        cout << "settlement geotransform ";
+        for (auto sgt: settlement_geo_transform) {
+            cout << sgt << " ";
+        }
+        cout << endl;
     }
 
     auto pfpr_dataset = OpenGeoTiff(input_path.at("pfpr"));
@@ -144,20 +162,35 @@ int main(int argc, char* argv[]) {
     auto pfpr_arr = OnDemandRaster(pfpr_band, pfpr_geo_transform);
 
     OGRLayer* first_admin_layer = *admin_dataset->GetLayers().begin();
+    OGRMultiPolygon mp_buffer;
     for (auto& admin_geometry: first_admin_layer) {
-        auto geometry = admin_geometry->GetGeometryRef();
+        auto geometry = admin_geometry->GetGeometryRef();  // reference, not owned
         if (geometry != nullptr) {
             auto geometry_type = geometry->getGeometryType();
-            if (geometry_type == wkbPolygon || geometry_type == wkbMultiPolygon) {
-                OGRMultiPolygon* multi_polygon = geometry->toMultiPolygon();
-                const double cutoff = 0.1;
-                map<array<int, 2>,PixelData> settlement_pfpr = sparse_settlements(
-                        settlement_arr, pfpr_arr, multi_polygon, settlement_geo_transform, cutoff
-                );
-                CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);
-            } else {
-                cout << "geometry wasn't a polygon!" << endl;
+            if (geometry_type != wkbPolygon && geometry_type != wkbMultiPolygon)
+            {
+                throw std::runtime_error("Geometry wasn't a polygon.");
             }
+            OGRMultiPolygon* multi_polygon{nullptr};
+            if (geometry_type == wkbPolygon)
+            {
+                // Directly means it doesn't clone the geometry, but adds it.
+                mp_buffer.addGeometryDirectly(geometry);
+                multi_polygon = &mp_buffer;
+            } else {
+                // Converts type but does not promote polygon to multipolygon.
+                multi_polygon = geometry->toMultiPolygon();
+            }
+            assert_x_is_longitude(multi_polygon);
+            map<array<int, 2>,PixelData> settlement_pfpr = sparse_settlements(
+                    settlement_arr, pfpr_arr, multi_polygon, settlement_geo_transform, population_cutoff
+            );
+            //CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);
+
+            if (geometry_type == wkbPolygon) {
+                bool do_not_delete{false};  // because it belongs to the layer.
+                mp_buffer.removeGeometry(0, do_not_delete);
+            }  // else no cleanup if geometry was a multipolygon.
         } else {
             cout << "geometry was null?" << endl;
         }

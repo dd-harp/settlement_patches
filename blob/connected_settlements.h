@@ -19,7 +19,7 @@
 #include "read_tiff.h"
 #include "pixel.h"
 
-namespace spacepop {
+namespace dd_harp {
 
 /*! Is this edge or point on the boundary of the complex?
  * or is it internal? */

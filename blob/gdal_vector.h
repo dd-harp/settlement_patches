@@ -7,7 +7,7 @@
 
 #include "gdal/gdal_priv.h"
 
-namespace spacepop {
+namespace dd_harp {
     void OpenShapefile(const boost::filesystem::path &shapefile_path);
     void WriteVector(const boost::filesystem::path &shape_filename);
 }

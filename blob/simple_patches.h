@@ -28,7 +28,7 @@
 #include "read_tiff.h"
 #include "pixel.h"
 
-namespace spacepop {
+namespace dd_harp {
     typedef CGAL::Exact_predicates_inexact_constructions_kernel PolygonKernel;
     typedef CGAL::Polygon_2<PolygonKernel> Polygon_2;
 

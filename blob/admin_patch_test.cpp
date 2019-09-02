@@ -4,7 +4,7 @@
 #include "admin_patch.h"
 
 using namespace std;
-using namespace spacepop;
+using namespace dd_harp;
 
 
 TEST(CreatePatches, BasicCall) {

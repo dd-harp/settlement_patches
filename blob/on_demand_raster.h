@@ -7,7 +7,7 @@
 
 class GDALRasterBand;
 
-namespace spacepop {
+namespace dd_harp {
 
 /*! Read GDAL Raster data set block-by-block, as pixels are requested.
  *  GDAL has a least-recently-used cache. This asks for the blocks it
@@ -15,7 +15,7 @@ namespace spacepop {
  *  is LRU underneath.
  */
     class OnDemandRaster {
-        const int x{0}, y{1};  // To make notation clearer.
+        const int _X{0}, _Y{1};  // To make notation clearer.
         GDALRasterBand *_band;
         const std::vector<double> &_transform;
         std::map <std::array<int, 2>, std::vector<double>> _buffer;

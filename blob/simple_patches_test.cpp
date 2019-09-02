@@ -5,7 +5,7 @@
 #include "simple_patches.h"
 
 using namespace std;
-using namespace spacepop;
+using namespace dd_harp;
 
 
 TEST(PixelsToPolygons, HandlesNullInput) {

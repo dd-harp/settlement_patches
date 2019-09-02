@@ -63,7 +63,7 @@ namespace boost::polygon {
     };
 }
 
-namespace spacepop {
+namespace dd_harp {
 // These templates convince boost::geometry to treat
 // an array of two doubles as a Point type.
 //namespace boost::geometry::traits {
@@ -170,7 +170,7 @@ void CreatePatches(
     // Transform the incoming multipolygon in place, not a copy.
     admin->transform(project.get());
     // Use Boost Polygon because it lets us create things and intersect and delaunay them.
-    auto admin_bg = convert(admin);
+    dmpolygon admin_bg = convert(admin);
 
     split_patches_retaining_pfpr(settlement_pfpr, settlement_geo_transform, admin_bg, project);
 

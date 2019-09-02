@@ -8,7 +8,7 @@
 
 class OGRMultiPolygon;
 
-namespace spacepop {
+namespace dd_harp {
 
     class OnDemandRaster;
 

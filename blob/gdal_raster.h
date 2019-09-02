@@ -13,7 +13,7 @@
 #include "gdal/cpl_conv.h"
 
 
-namespace spacepop {
+namespace dd_harp {
     std::shared_ptr<GDALDataset>  OpenGeoTiff(const boost::filesystem::path& tiff_file);
 
     template<typename PointOutputIterator>

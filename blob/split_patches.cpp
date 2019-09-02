@@ -19,7 +19,7 @@ namespace bg = boost::geometry;
 using dpoint = model::d2::point_xy<double>;
 using dpolygon = model::polygon<dpoint>;
 
-namespace spacepop {
+namespace dd_harp {
 /*! Convert a GDAL OGRMultiPolygon into a Boost multi_polygon
  *
  * @param gdal_poly Reads but does not write this.

@@ -6,7 +6,7 @@
 
 #include "gdal/ogr_spatialref.h"
 
-namespace spacepop {
+namespace dd_harp {
     std::shared_ptr<OGRCoordinateTransformation>
             reproject(OGRSpatialReference* purely_lat_long_srs);
 

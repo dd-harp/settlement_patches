@@ -76,7 +76,7 @@ namespace dd_harp {
     POINTISH pixel_coord(std::array<int, 2> pixel, const std::vector<double>& transform) {
         return {
                 transform[0] + pixel[0] * transform[1] + pixel[1] * transform[2],
-                transform[3] + pixel[1] * transform[4] + pixel[5]
+                transform[3] + pixel[0] * transform[4] + pixel[1] * transform[5]
         };
     }
 

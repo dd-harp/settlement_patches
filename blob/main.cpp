@@ -1,4 +1,4 @@
-
+#include <cstdio>
 #include <iostream>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -84,10 +84,17 @@ void assert_x_is_longitude(const OGRMultiPolygon * geometry) {
 int entry(int argc, char* argv[])
 {
     ios_base::sync_with_stdio(false);
+    const char* user = getenv("USER");
+    string home{"/home/"};
+    if (user != nullptr) {
+        home += user;
+    } else {
+        home += "adolgert";
+    }
     map<string,fs::path> input_path = {
-            {"settlement", "/home/adolgert/dev/spacepop/data/hrsl/hrsl_uga_pop.tif"},
-            {"pfpr", "/home/adolgert/dev/spacepop/data/PfPR/Raster Data/PfPR_rmean/2019_Global_PfPR_2017.tif"},
-            {"admin", "/home/adolgert/dev/spacepop/data/uga_admbnda/uga_admbnda_adm3_UBOS_v5.shp"},
+            {"settlement", home + "/dev/spacepop/data/hrsl/hrsl_uga_pop.tif"},
+            {"pfpr", home + "/dev/spacepop/data/PfPR/Raster Data/PfPR_rmean/2019_Global_PfPR_2017.tif"},
+            {"admin", home + "/dev/spacepop/data/uga_admbnda/uga_admbnda_adm3_UBOS_v5.shp"},
     };
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, parser(input_path)), vm);

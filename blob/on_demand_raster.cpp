@@ -1,3 +1,4 @@
+#include <cassert>
 #include <sstream>
 
 #include "gdal/gdal_priv.h"
@@ -49,9 +50,10 @@ double OnDemandRaster::at(std::array<int, 2> ix) {
             throw std::runtime_error(err.str());
         }
     }
-    return (buffer->second.at(
-            ix[_X] - _block_size[_X] * block[_X] +
-            _block_size[_X] * (ix[_Y] - _block_size[_Y] * block[_Y])
-    ));
+    auto index_in_block = ix[_X] - _block_size[_X] * block[_X] +
+                          _block_size[_X] * (ix[_Y] - _block_size[_Y] * block[_Y]);
+    assert(index_in_block >= 0);
+    assert(index_in_block < _block_size[_X] * _block_size[_Y]);
+    return buffer->second.at(index_in_block);
 }
 }

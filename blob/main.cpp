@@ -141,7 +141,7 @@ int entry(int argc, char* argv[])
     auto pfpr_dataset = OpenGeoTiff(input_path.at("pfpr"));
     GDALRasterBand* pfpr_band = pfpr_dataset->GetRasterBand(1);
     vector<double> pfpr_geo_transform(6);
-    if (settlement_dataset->GetGeoTransform(&pfpr_geo_transform[0]) != CE_None) {
+    if (pfpr_dataset->GetGeoTransform(&pfpr_geo_transform[0]) != CE_None) {
         cout << "Could not get pfpr transform" << endl;
         return 10;
     }
@@ -172,7 +172,9 @@ int entry(int argc, char* argv[])
 
     OGRLayer* first_admin_layer = *admin_dataset->GetLayers().begin();
     OGRMultiPolygon mp_buffer;
+    int poly_idx{0};
     for (auto& admin_geometry: first_admin_layer) {
+        cout << "polygon " << poly_idx << endl;
         auto geometry = admin_geometry->GetGeometryRef();  // reference, not owned
         if (geometry != nullptr) {
             auto geometry_type = geometry->getGeometryType();
@@ -203,6 +205,7 @@ int entry(int argc, char* argv[])
         } else {
             cout << "geometry was null?" << endl;
         }
+        ++poly_idx;
     }
 
     return 0;

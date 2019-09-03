@@ -13,10 +13,11 @@ OnDemandRaster::OnDemandRaster(GDALRasterBand* band, const std::vector<double>& 
         : _band(band), _transform(geo_transform) {
     this->_band->GetBlockSize(&_block_size[_X], &_block_size[_Y]);
     this->_size[_X] = this->_band->GetXSize();  // Track long, lat vs lat, long.
-    this->_size[_X] = this->_band->GetYSize();
+    this->_size[_Y] = this->_band->GetYSize();
     for (auto coord: {_X, _Y}) {
         this->_block_cnt[coord] = (this->_size[coord] + _block_size[coord] - 1) / _block_size[coord];
     }
+    assert(this->_band->GetRasterDataType() == GDALDataType::GDT_Float64);
 }
 
 

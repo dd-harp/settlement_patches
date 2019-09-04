@@ -3,6 +3,7 @@
 
 #include <array>
 #include <map>
+#include <utility>
 #include <vector>
 
 class GDALRasterBand;
@@ -22,8 +23,14 @@ namespace dd_harp {
 
     public:
         OnDemandRaster(GDALRasterBand *band, const std::vector<double> &geo_transform);
+        //! Find the value at a lat-long.
         double at_coord(double lat_coord, double long_coord);
+        //! Find a value at a particular pixel.
         double at(std::array<int, 2> ix);
+
+        using bounds = std::pair<std::array<int, 2>, std::array<int, 2>>;
+        //! Ensure a bounding box is inside this raster.
+        bounds clip_to_bounds(const bounds& min_max);
 
     private:
         std::array<int, 2> _size;  // Total pixels in raster as x, y

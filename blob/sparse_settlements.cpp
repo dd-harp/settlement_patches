@@ -55,7 +55,9 @@ namespace dd_harp {
             const double cutoff
     ) {
         auto settlement_min_max = gdal_geometry_min_max(admin, settlement_geo_transform);
-        const auto&[settlement_min, settlement_max] = settlement_min_max;
+        // Clip bounds because the admin units can be outside the given settlements.
+        // The person supplying data will see the bounds of that data.
+        const auto&[settlement_min, settlement_max] = settlement_arr.clip_to_bounds(settlement_min_max);
         map<array<int, 2>, PixelData> settlement_pfpr;
         for (int pixel_y = settlement_min[Y]; pixel_y < settlement_max[Y]; ++pixel_y) {
             for (int pixel_x = settlement_min[X]; pixel_x < settlement_max[X]; ++pixel_x) {

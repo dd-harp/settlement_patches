@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <sstream>
 
@@ -6,6 +7,8 @@
 #include "gdal_raster.h"
 #include "on_demand_raster.h"
 
+
+using namespace std;
 
 namespace dd_harp {
 
@@ -56,5 +59,13 @@ double OnDemandRaster::at(std::array<int, 2> ix) {
     assert(index_in_block >= 0);
     assert(index_in_block < _block_size[_X] * _block_size[_Y]);
     return buffer->second.at(index_in_block);
+}
+
+
+OnDemandRaster::bounds OnDemandRaster::clip_to_bounds(const bounds& min_max) {
+    return {
+            {max(min_max.first[0], 0), max(min_max.first[1], 0)},
+            {min(min_max.second[0], this->_size[0]), min(min_max.second[1], this->_size[1])},
+    };
 }
 }

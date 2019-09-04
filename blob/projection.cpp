@@ -35,8 +35,8 @@ namespace dd_harp {
     tuple<shared_ptr<OGRCoordinateTransformation>,shared_ptr<OGRCoordinateTransformation>>
     projection_for_lat_long(double latitude, double longitude) {
         OGRSpatialReference pure_lat_long;
+        // GDAL 3.0 has an axis mapping strategy to allow long-lat.
         pure_lat_long.SetWellKnownGeogCS("WGS84");
-
         int target_utm = static_cast<int>(lround(ceil((longitude + 180) / 6)));
         int North = (latitude > 0) ? 1 : 0;
         OGRSpatialReference target_srs;

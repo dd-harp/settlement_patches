@@ -29,9 +29,13 @@ void copy_linear_ring(RING& ring, OGRLinearRing* linear_ring) {
     for (const auto& gd_pt: linear_ring) {
         append(ring, dpoint{gd_pt.getX(), gd_pt.getY()});
     }
-    if (linear_ring->isClockwise() == (point_order<RING>::value == order_selector::clockwise)) {
+    assert(
+            point_order<RING>::value == order_selector::clockwise ||
+                    point_order<RING>::value == order_selector::counterclockwise
+    );
+    if (linear_ring->isClockwise() != (point_order<RING>::value == order_selector::clockwise)) {
         boost::geometry::reverse(ring);
-    }
+    }  // else the ring is already in the correct direction.
 }
 
 
@@ -113,7 +117,8 @@ void split_patches_retaining_pfpr(
                 bg::set<0>(pix_centroid, cx / intersect_area);
                 bg::set<1>(pix_centroid, cy / intersect_area);
 
-                if (total_area - intersect_area > 0.01 * total_area) {
+                const double small_overlap{0.01};
+                if (total_area - intersect_area > small_overlap * total_area) {
                     // The centroid of the outside can be computed from the total centroid and inside centroid.
                     bg::set<0>(
                             outside_centroid,
@@ -131,6 +136,7 @@ void split_patches_retaining_pfpr(
                     pd.area_out = total_area - intersect_area;
                     pd.centroid_out = outside_centroid;
                 } else {
+                    // The overlap is small, so fall back to including this pixel in one category.
                     pd.overlap = Overlap::in;
                     pd.area_in = total_area;
                     pd.centroid_in = pix_centroid;

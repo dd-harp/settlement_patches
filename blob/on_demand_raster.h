@@ -24,7 +24,7 @@ namespace dd_harp {
     public:
         OnDemandRaster(GDALRasterBand *band, const std::vector<double> &geo_transform);
         //! Find the value at a lat-long.
-        double at_coord(double lat_coord, double long_coord);
+        double at_coord(double long_coord, double lat_coord);
         //! Find a value at a particular pixel.
         double at(std::array<int, 2> ix);
 

@@ -196,7 +196,7 @@ int entry(int argc, char* argv[])
             map<array<int, 2>,PixelData> settlement_pfpr = sparse_settlements(
                     settlement_arr, pfpr_arr, multi_polygon, settlement_geo_transform, population_cutoff
             );
-            //CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);
+            CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);
 
             if (geometry_type == wkbPolygon) {
                 bool do_not_delete{false};  // because it belongs to the layer.

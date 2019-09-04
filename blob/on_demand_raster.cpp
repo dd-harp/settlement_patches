@@ -24,8 +24,8 @@ OnDemandRaster::OnDemandRaster(GDALRasterBand* band, const std::vector<double>& 
 }
 
 
-double OnDemandRaster::at_coord(double lat_coord, double long_coord) {
-    auto ix = pixel_containing({lat_coord, long_coord}, this->_transform);
+double OnDemandRaster::at_coord(double long_coord, double lat_coord) {
+    auto ix = pixel_containing({long_coord, lat_coord}, this->_transform);
     return this->at(ix);
 }
 

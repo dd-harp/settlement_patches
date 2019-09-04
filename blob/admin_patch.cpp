@@ -1,6 +1,7 @@
 #include <cmath>
 #include <deque>
 #include <iostream>
+#include <memory>
 
 #include "boost/geometry.hpp"
 #include "boost/geometry/geometries/point_xy.hpp"
@@ -157,6 +158,11 @@ void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
 }
 
 
+struct MPDelete {
+    void operator()(OGRMultiPolygon* p) { OGRGeometryFactory::destroyGeometry(p); }
+};
+
+
 void CreatePatches(
         OGRMultiPolygon* admin, map<array<int, 2>,PixelData>& settlement_pfpr,
         const std::vector<double>& settlement_geo_transform
@@ -168,9 +174,10 @@ void CreatePatches(
     auto [project, unproject] = projection_for_lat_long(polygon_bounding_box.MinY, polygon_bounding_box.MinX);
 
     // Transform the incoming multipolygon in place, not a copy.
-    admin->transform(project.get());
+    auto local_admin = unique_ptr<OGRMultiPolygon, MPDelete>(admin->clone()->toMultiPolygon(), MPDelete());
+    local_admin->transform(project.get());
     // Use Boost Polygon because it lets us create things and intersect and delaunay them.
-    dmpolygon admin_bg = convert(admin);
+    dmpolygon admin_bg = convert_gdal_to_boost(local_admin.get());
 
     split_patches_retaining_pfpr(settlement_pfpr, settlement_geo_transform, admin_bg, project);
 

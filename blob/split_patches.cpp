@@ -25,7 +25,7 @@ namespace dd_harp {
  * @param gdal_poly Reads but does not write this.
  * @return Boost multi_polygon
  */
-dmpolygon convert(OGRMultiPolygon const* gdal_poly) {
+dmpolygon convert_gdal_to_boost(const OGRMultiPolygon* gdal_poly) {
     dmpolygon dpoly;
     dpoly.resize(gdal_poly->getNumGeometries());
     int poly_idx{0};

@@ -1,3 +1,5 @@
+#include <iterator>
+
 #include "boost/geometry.hpp"
 #include "boost/geometry/geometries/point_xy.hpp"
 #include "boost/geometry/geometries/polygon.hpp"
@@ -20,28 +22,38 @@ using dpoint = model::d2::point_xy<double>;
 using dpolygon = model::polygon<dpoint>;
 
 namespace dd_harp {
+
+//! Copies a OGRLineString to a Boost linestring, reversing points if necessary.
+template<typename RING>
+void copy_linear_ring(RING& ring, OGRLinearRing* linear_ring) {
+    for (const auto& gd_pt: linear_ring) {
+        append(ring, dpoint{gd_pt.getX(), gd_pt.getY()});
+    }
+    if (linear_ring->isClockwise() == (point_order<RING>::value == order_selector::clockwise)) {
+        boost::geometry::reverse(ring);
+    }
+}
+
+
 /*! Convert a GDAL OGRMultiPolygon into a Boost multi_polygon
  *
- * @param gdal_poly Reads but does not write this.
- * @return Boost multi_polygon
+ * @param gdal_poly Reads but does not write this. Uses counter-clockwise winding
+ *                  of points on outer rings.
+ * @return Boost multi-polygon. Uses clockwise winding of points on outer rings.
  */
-dmpolygon convert_gdal_to_boost(const OGRMultiPolygon* gdal_poly) {
+dmpolygon convert_gdal_to_boost(OGRMultiPolygon* gdal_poly) {
     dmpolygon dpoly;
     dpoly.resize(gdal_poly->getNumGeometries());
     int poly_idx{0};
-    for (const auto& child_poly: gdal_poly) {
+    for (const auto& outer_polygon: gdal_poly) {
         dpolygon& single{dpoly[poly_idx]};
-        OGRLinearRing const* exterior = child_poly->getExteriorRing();
-        bool outer_clock = exterior->isClockwise();  // XXX track clockwise or CCW
-        for (const auto& gd_pt: exterior) {
-            append(single.outer(), dpoint{gd_pt.getX(), gd_pt.getY()});
-        }
-        single.inners().resize(child_poly->getNumInteriorRings());
-        for (int inner=0; inner < child_poly->getNumInteriorRings(); ++inner) {
-            OGRLinearRing const* interior = child_poly->getInteriorRing(inner);
-            for (const auto& in_pt: interior) {
-                append(single.inners()[inner], dpoint{in_pt.getX(), in_pt.getY()});
-            }
+        OGRLinearRing* exterior = outer_polygon->getExteriorRing();
+        copy_linear_ring(single.outer(), exterior);
+
+        single.inners().resize(outer_polygon->getNumInteriorRings());
+        for (int inner_idx=0; inner_idx < outer_polygon->getNumInteriorRings(); ++inner_idx) {
+            OGRLinearRing* interior = outer_polygon->getInteriorRing(inner_idx);
+            copy_linear_ring(single.inners()[inner_idx], interior);
         }
         ++poly_idx;
     }

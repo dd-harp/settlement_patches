@@ -16,10 +16,11 @@ namespace dd_harp {
     class PixelData;
 /*! Convert a GDAL OGRMultiPolygon into a Boost multi_polygon
  *
- * @param gdal_poly Reads but does not write this.
+ * @param gdal_poly Reads from the polygon, possibly transforming it in
+ *                  the process, in case it has a different winding order.
  * @return Boost multi_polygon
  */
-    dmpolygon convert_gdal_to_boost(const OGRMultiPolygon* gdal_poly);
+    dmpolygon convert_gdal_to_boost(OGRMultiPolygon* gdal_poly);
 
     void split_patches_retaining_pfpr(
             std::map <std::array<int, 2>, PixelData> &settlement_pfpr,

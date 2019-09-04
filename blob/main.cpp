@@ -178,13 +178,11 @@ int entry(int argc, char* argv[])
         auto geometry = admin_geometry->GetGeometryRef();  // reference, not owned
         if (geometry != nullptr) {
             auto geometry_type = geometry->getGeometryType();
-            if (geometry_type != wkbPolygon && geometry_type != wkbMultiPolygon)
-            {
+            if (geometry_type != wkbPolygon && geometry_type != wkbMultiPolygon) {
                 throw std::runtime_error("Geometry wasn't a polygon.");
             }
             OGRMultiPolygon* multi_polygon{nullptr};
-            if (geometry_type == wkbPolygon)
-            {
+            if (geometry_type == wkbPolygon) {
                 // Directly means it doesn't clone the geometry, but adds it.
                 mp_buffer.addGeometryDirectly(geometry);
                 multi_polygon = &mp_buffer;

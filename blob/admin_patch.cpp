@@ -114,7 +114,11 @@ bool cell_in_admin(vector<PixelData>& pixel_data, size_t idx) {
     return relation == Overlap::in || relation == Overlap::on;
 }
 
-using Graph=boost::adjacency_list<boost::listS, boost::vecS, boost::undirectedS>;
+struct PatchDescription {
+    size_t index;  // Tells us which settlement this is.
+};
+
+using Graph=boost::adjacency_list<boost::listS, boost::vecS, boost::undirectedS, PatchDescription>;
 using GraphEdge=boost::graph_traits<Graph>::edge_descriptor;
 using GraphVertex=boost::graph_traits<Graph>::vertex_descriptor;
 
@@ -158,11 +162,11 @@ void write_components(const vector<vector<size_t>>& components, const vector<Pix
         for (auto settle_idx: settlements) {
             const PixelData& pd{settlement_pfpr.at(settle_idx)};
             pop += pd.pop;
-            pfpr += pd.pfpr;
+            pfpr += pd.pfpr * pd.pop;
         }
         auto sep{", "};
         csv << component_idx << sep << pop << sep << settlements.size() << sep
-            << pfpr / settlements.size() << endl;
+            << pfpr / pop << endl;
         ++component_idx;
     }
 }
@@ -218,15 +222,26 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     voronoi_diagram<double> vd;
     construct_voronoi(points.begin(), points.end(), segments.begin(), segments.end(), &vd);
 
-    // Make a graph
-    Graph connection{settlement_pfpr.size()};
+    // Make a graph that knows which settlements are in it.
+    map<size_t, size_t> settlement_idx_to_graph_idx;
+    size_t remain_idx{0};
+    size_t vector_idx{0};
+    for (const auto& pixel_read: settlement_pfpr) {
+        auto overlap = pixel_read.overlap;
+        if (overlap == Overlap::in || overlap == Overlap::on) {
+            settlement_idx_to_graph_idx[vector_idx] = remain_idx;
+            ++remain_idx;
+        }
+        ++vector_idx;
+    }
 
+    // Walk edges to turn them into graph links.
     for (auto& set_edge_unseen: vd.edges()) {
         if (set_edge_unseen.is_primary()) {
             set_edge_unseen.color(0);
         }
     }
-    // Walk edges to turn them into graph links.
+    vector<pair<int, int>> edges;
     int edge_cnt{0};
     for (auto& edge_iter: vd.edges()) {
         if (edge_iter.is_primary() && edge_iter.color() == 0) {
@@ -235,10 +250,7 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
             auto cell_a = edge_iter.cell()->source_index();
             auto cell_b = edge_iter.twin()->cell()->source_index();
             if (cell_in_admin(settlement_pfpr, cell_a) && cell_in_admin(settlement_pfpr, cell_b)) {
-                auto [added_edge, added] = add_edge(cell_a, cell_b, connection);
-                if (!added) {
-                    cout << "not added " << cell_a << " " << cell_b << endl;
-                }
+                edges.emplace_back(make_pair(settlement_idx_to_graph_idx[cell_a], settlement_idx_to_graph_idx[cell_b]));
                 ++edge_cnt;
             }
         }
@@ -246,6 +258,19 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     if (edge_cnt == 0 || settlement_cnt == 0) {
         return;
     }
+
+    const size_t settlement_in_admin_cnt{settlement_idx_to_graph_idx.size()};
+    Graph connection{
+        edges.begin(),
+        edges.end(),
+        settlement_in_admin_cnt,
+        edges.size()
+    };
+    for (const auto& conn_iter: settlement_idx_to_graph_idx) {
+        connection[conn_iter.second].index = conn_iter.first;
+    }
+
+
     const int settle_size{500};
     if (settlement_cnt > settle_size) {
         size_t component_cnt = component_count(connection);

@@ -1,5 +1,6 @@
 #include <cmath>
 #include <deque>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -113,7 +114,7 @@ bool cell_in_admin(vector<PixelData>& pixel_data, size_t idx) {
     return relation == Overlap::in || relation == Overlap::on;
 }
 
-using Graph=boost::adjacency_list<boost::listS, boost::vecS>;
+using Graph=boost::adjacency_list<boost::listS, boost::vecS, boost::undirectedS>;
 using GraphEdge=boost::graph_traits<Graph>::edge_descriptor;
 using GraphVertex=boost::graph_traits<Graph>::vertex_descriptor;
 
@@ -132,6 +133,39 @@ struct centrality_done {
         return done;
     }
 };
+
+
+template<typename GRAPH>
+size_t component_count(const GRAPH& connection) {
+    map<GraphVertex, size_t> component_map;
+    boost::associative_property_map<map<GraphVertex, size_t>> pcomponent_map{component_map};
+    boost::connected_components(connection, pcomponent_map);
+
+    std::unordered_set<size_t> component_cnt;
+    for (const auto& how_many: component_map) {
+        component_cnt.insert(how_many.second);
+    }
+    return component_cnt.size();
+}
+
+
+void write_components(const vector<vector<size_t>>& components, const vector<PixelData>& settlement_pfpr) {
+    fstream csv{"components.csv", fstream::out};
+    int component_idx{0};
+    for (const auto& settlements: components) {
+        double pfpr{0};
+        double pop{0};
+        for (auto settle_idx: settlements) {
+            const PixelData& pd{settlement_pfpr.at(settle_idx)};
+            pop += pd.pop;
+            pfpr += pd.pfpr;
+        }
+        auto sep{", "};
+        csv << component_idx << sep << pop << sep << settlements.size() << sep
+            << pfpr / settlements.size() << endl;
+        ++component_idx;
+    }
+}
 
 
 void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
@@ -214,6 +248,8 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     }
     const int settle_size{500};
     if (settlement_cnt > settle_size) {
+        size_t component_cnt = component_count(connection);
+        cout << "graph starts with " << component_cnt << " components" << endl;
         using VertexIndex=map<GraphVertex, int>;
         VertexIndex vertex_index;
         auto[vert_iter, vert_end] = vertices(connection);
@@ -231,6 +267,21 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
         boost::betweenness_centrality_clustering(connection, doneness, pcentrality, pvertex_index);
         cout << "splits " << doneness._partition_idx << " splits" << endl;
     }
+
+    map<GraphVertex, size_t> component_map;
+    boost::associative_property_map<map<GraphVertex, size_t>> pcomponent_map{component_map};
+    boost::connected_components(connection, pcomponent_map);
+
+    size_t component_cnt{0};
+    for (const auto& how_many: component_map) {
+        component_cnt = std::max(component_cnt, how_many.second + 1);
+    }
+
+    vector<vector<size_t>> components{component_cnt};
+    for (const auto& settle: component_map) {
+        components.at(settle.second).push_back(settle.first);
+    }
+    write_components(components, settlement_pfpr);
 }
 
 

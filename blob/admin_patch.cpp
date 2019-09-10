@@ -10,8 +10,10 @@
 #include "boost/geometry/geometries/segment.hpp"
 #include "boost/graph/adjacency_list.hpp"
 #include "boost/graph/bc_clustering.hpp"
+#include "boost/graph/connected_components.hpp"
 #include "boost/polygon/voronoi.hpp"
 #include "boost/polygon/polygon.hpp"
+#include <boost/property_map/property_map.hpp>
 #include "gdal/ogr_geometry.h"
 
 #include "admin_patch.h"
@@ -111,6 +113,26 @@ bool cell_in_admin(vector<PixelData>& pixel_data, size_t idx) {
     return relation == Overlap::in || relation == Overlap::on;
 }
 
+using Graph=boost::adjacency_list<boost::listS, boost::vecS>;
+using GraphEdge=boost::graph_traits<Graph>::edge_descriptor;
+using GraphVertex=boost::graph_traits<Graph>::vertex_descriptor;
+
+struct centrality_done {
+    int _partition_cnt;
+    int _partition_idx;
+    explicit centrality_done(int partition_cnt) : _partition_cnt{partition_cnt}, _partition_idx{0} {}
+    centrality_done(const centrality_done&) = default;
+
+    bool operator()(double maximum_centrality, GraphEdge edge_to_remove, const Graph& graph) {
+        bool done = (this->_partition_idx >= this->_partition_cnt);
+        this->_partition_idx++;
+        cout << "centrality " << maximum_centrality << " "
+            << edge_to_remove << " " << _partition_idx
+            << " partition_cnt " << this->_partition_cnt << " " << done << endl;
+        return done;
+    }
+};
+
 
 void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     array<double, 2> bmin{numeric_limits<double>::max(), numeric_limits<double>::max()};
@@ -138,6 +160,7 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     array<double, 2> scale = { max_val / (bmax[0] - bmin[0]), max_val / (bmax[1] - bmin[1])};
 
     std::vector<ipoint> points;
+    int settlement_cnt{0};
     for (const auto& sd: settlement_pfpr) {
         if (sd.overlap == Overlap::in || sd.overlap == Overlap::on) {
             auto cpx = sd.centroid_in.get<0>();
@@ -146,6 +169,7 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
                     static_cast<int>(lround((cpx - bmin[0]) * scale[0])),
                     static_cast<int>(lround((cpy - bmin[1]) * scale[1]))
             });
+            ++settlement_cnt;
         }
         if (sd.overlap == Overlap::out || sd.overlap == Overlap::on) {
             auto cpx = sd.centroid_out.get<0>();
@@ -161,7 +185,6 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     construct_voronoi(points.begin(), points.end(), segments.begin(), segments.end(), &vd);
 
     // Make a graph
-    using Graph=boost::adjacency_list<boost::listS, boost::vecS>;
     Graph connection{settlement_pfpr.size()};
 
     for (auto& set_edge_unseen: vd.edges()) {
@@ -170,6 +193,7 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
         }
     }
     // Walk edges to turn them into graph links.
+    int edge_cnt{0};
     for (auto& edge_iter: vd.edges()) {
         if (edge_iter.is_primary() && edge_iter.color() == 0) {
             edge_iter.color(1);
@@ -181,11 +205,32 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
                 if (!added) {
                     cout << "not added " << cell_a << " " << cell_b << endl;
                 }
+                ++edge_cnt;
             }
         }
     }
-
-    //boost::betweenness_centrality_clustering(connection)
+    if (edge_cnt == 0 || settlement_cnt == 0) {
+        return;
+    }
+    const int settle_size{500};
+    if (settlement_cnt > settle_size) {
+        using VertexIndex=map<GraphVertex, int>;
+        VertexIndex vertex_index;
+        auto[vert_iter, vert_end] = vertices(connection);
+        for (int vert_idx = 0; vert_iter != vert_end; ++vert_iter, ++vert_idx) {
+            vertex_index[*vert_iter] = vert_idx;
+        }
+        int split_cnt = settlement_cnt / settle_size;
+        auto doneness = centrality_done{split_cnt};
+        using CentralityMap=map<GraphEdge, double>;
+        CentralityMap centrality;
+        boost::associative_property_map<CentralityMap> pcentrality{centrality};
+        boost::associative_property_map<VertexIndex> pvertex_index{vertex_index};
+        cout << "centrality start " << edge_cnt << " edges "
+            << split_cnt << " verts " << settlement_cnt << endl;
+        boost::betweenness_centrality_clustering(connection, doneness, pcentrality, pvertex_index);
+        cout << "splits " << doneness._partition_idx << " splits" << endl;
+    }
 }
 
 

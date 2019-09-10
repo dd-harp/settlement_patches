@@ -28,7 +28,7 @@ namespace dd_harp
      * @param pfpr_geo_transform Also a transformation from (P,L) to (Xp, Yp).
      */
     void CreatePatches(
-            OGRMultiPolygon* admin, std::map<std::array<int, 2>,PixelData>& settlement_pfpr,
+            OGRMultiPolygon* admin, std::vector<PixelData>& settlement_pfpr,
             const std::vector<double>& settlement_geo_transform
             );
 }

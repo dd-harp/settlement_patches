@@ -67,14 +67,14 @@ dmpolygon convert_gdal_to_boost(OGRMultiPolygon* gdal_poly) {
 
 
 void split_patches_retaining_pfpr(
-        map<array<int, 2>,PixelData>& settlement_pfpr,
+        vector<PixelData>& settlement_pfpr,
         const vector<double>& settlement_geo_transform,
         const dmpolygon& admin_bg,
         shared_ptr<OGRCoordinateTransformation>& project
 ) {
-    for (auto& pixel_iter: settlement_pfpr) {
+    for (auto& pixel_data: settlement_pfpr) {
         // Apply the projection before making the new polygon.
-        auto bounds = pixel_bounds<dpoint>(pixel_iter.first, settlement_geo_transform);
+        auto bounds = pixel_bounds<dpoint>(pixel_data.x, settlement_geo_transform);
         for (auto& bound: bounds) {
             double bx{get<0>(bound)};
             double by{get<1>(bound)};
@@ -88,8 +88,6 @@ void split_patches_retaining_pfpr(
 
         // If the polygon is split by the side, get the centroid of the inner pieces
         // and the centroid of the outer pieces. That's enough for making patches.
-        PixelData& pd{pixel_iter.second};
-
         double intersect_area{0};
         double total_area{area(pixel_poly)};
         dpoint pix_centroid{0, 0};
@@ -100,9 +98,9 @@ void split_patches_retaining_pfpr(
         // within is the same as the covered() function for polygons.
         bool is_within = within(pixel_poly, admin_bg);
         if (is_within) {
-            pd.overlap = Overlap::in;
-            pd.area_in = total_area;
-            pd.centroid_in = pix_centroid;
+            pixel_data.overlap = Overlap::in;
+            pixel_data.area_in = total_area;
+            pixel_data.centroid_in = pix_centroid;
         } else if (does_overlap) {
             deque<dpolygon> output;
             intersection(pixel_poly, admin_bg, output);
@@ -132,22 +130,22 @@ void split_patches_retaining_pfpr(
                         (bg::get<1>(total_centroid) * total_area
                          - bg::get<1>(pix_centroid) * intersect_area) / (total_area - intersect_area)
                 );
-                pd.overlap = Overlap::on;
-                pd.area_in = intersect_area;
-                pd.centroid_in = pix_centroid;
-                pd.area_out = total_area - intersect_area;
-                pd.centroid_out = outside_centroid;
+                pixel_data.overlap = Overlap::on;
+                pixel_data.area_in = intersect_area;
+                pixel_data.centroid_in = pix_centroid;
+                pixel_data.area_out = total_area - intersect_area;
+                pixel_data.centroid_out = outside_centroid;
             } else {
                 // The overlap is small, so fall back to including this pixel in one category.
-                pd.overlap = Overlap::in;
-                pd.area_in = total_area;
-                pd.centroid_in = pix_centroid;
+                pixel_data.overlap = Overlap::in;
+                pixel_data.area_in = total_area;
+                pixel_data.centroid_in = pix_centroid;
             }
         } else {
-            intersect_area = 0;
-            pd.overlap = Overlap::out;
-            pd.area_out = total_area;
-            pd.centroid_out = pix_centroid;
+            pixel_data.overlap = Overlap::out;
+            pixel_data.area_in = 0;
+            pixel_data.area_out = total_area;
+            pixel_data.centroid_out = pix_centroid;
         }
     }
 }

@@ -191,7 +191,7 @@ int entry(int argc, char* argv[])
                 multi_polygon = geometry->toMultiPolygon();
             }
             assert_x_is_longitude(multi_polygon);
-            map<array<int, 2>,PixelData> settlement_pfpr = sparse_settlements(
+            vector<PixelData> settlement_pfpr = sparse_settlements(
                     settlement_arr, pfpr_arr, multi_polygon, settlement_geo_transform, population_cutoff
             );
             CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);

@@ -2,7 +2,6 @@
 #define BLOB_SPARSE_SETTLEMENTS_H
 
 #include <array>
-#include <map>
 #include <vector>
 #include "boost/geometry/geometries/point_xy.hpp"
 
@@ -22,10 +21,11 @@ namespace dd_harp {
     gdal_geometry_min_max(const OGRMultiPolygon *admin, const std::vector<double> &settlement_geo_transform);
 
     enum class Overlap {
-        in, out, on
+        unknown, in, out, on
     };
 
     struct PixelData {
+        std::array<int, 2> x;
         double pfpr;
         double pop;
         Overlap overlap;
@@ -33,16 +33,17 @@ namespace dd_harp {
         boost::geometry::model::d2::point_xy<double> centroid_out;
         double area_in;
         double area_out;
+        PixelData(std::array<int, 2> x, double pfpr, double pop);
     };
 
 
-    std::map <std::array<int, 2>, PixelData>
+    std::vector<PixelData>
     sparse_settlements(
             OnDemandRaster &settlement_arr,
             OnDemandRaster &pfpr_arr,
             const OGRMultiPolygon *admin,
             const std::vector<double> &settlement_geo_transform,
-            const double cutoff
+            double cutoff
     );
 }
 

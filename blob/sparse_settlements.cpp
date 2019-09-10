@@ -45,8 +45,13 @@ namespace dd_harp {
         return {settlement_min, settlement_max};
     }
 
+    PixelData::PixelData(std::array<int, 2> x_, double pfpr_, double pop_)
+    : x{x_}, pfpr{pfpr_}, pop{pop_}, overlap{Overlap::unknown}, centroid_in{}, centroid_out{},
+    area_in{0}, area_out{0}
+    { }
 
-    map<array<int, 2>, PixelData>
+
+    vector<PixelData>
     sparse_settlements(
             OnDemandRaster &settlement_arr,
             OnDemandRaster &pfpr_arr,
@@ -58,15 +63,14 @@ namespace dd_harp {
         // Clip bounds because the admin units can be outside the given settlements.
         // The person supplying data will see the bounds of that data.
         const auto&[settlement_min, settlement_max] = settlement_arr.clip_to_bounds(settlement_min_max);
-        map<array<int, 2>, PixelData> settlement_pfpr;
+        vector<PixelData> settlement_pfpr;
         for (int pixel_y = settlement_min[Y]; pixel_y < settlement_max[Y]; ++pixel_y) {
             for (int pixel_x = settlement_min[X]; pixel_x < settlement_max[X]; ++pixel_x) {
                 double pixel_pop = settlement_arr.at({pixel_x, pixel_y});
                 if (pixel_pop > cutoff) {
                     auto settlement_coord = pixel_coord<array<double, 2>>({pixel_x, pixel_y}, settlement_geo_transform);
-                    PixelData pd{pfpr_arr.at_coord(settlement_coord[0], settlement_coord[1]), pixel_pop};
-                    array<int, 2> create_pixel{pixel_x, pixel_y};
-                    settlement_pfpr.insert(make_pair(create_pixel, pd));
+                    PixelData pd{{pixel_x, pixel_y}, pfpr_arr.at_coord(settlement_coord[0], settlement_coord[1]), pixel_pop};
+                    settlement_pfpr.push_back(pd);
                 }
             }
         }

@@ -8,6 +8,8 @@
 #include "boost/geometry/geometries/point_xy.hpp"
 #include "boost/geometry/geometries/polygon.hpp"
 #include "boost/geometry/geometries/segment.hpp"
+#include "boost/graph/adjacency_list.hpp"
+#include "boost/graph/bc_clustering.hpp"
 #include "boost/polygon/voronoi.hpp"
 #include "boost/polygon/polygon.hpp"
 #include "gdal/ogr_geometry.h"
@@ -101,11 +103,19 @@ namespace dd_harp {
 
 const int X{0}, Y{1};
 
+bool cell_in_admin(vector<PixelData>& pixel_data, size_t idx) {
+    if (idx >= pixel_data.size()) {
+        return false;  // Some cells aren't associated with input points.
+    }
+    auto relation{pixel_data.at(idx).overlap};
+    return relation == Overlap::in || relation == Overlap::on;
+}
 
-void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
+
+void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     array<double, 2> bmin{numeric_limits<double>::max(), numeric_limits<double>::max()};
     array<double, 2> bmax{numeric_limits<double>::min(), numeric_limits<double>::min()};
-    for (const auto& [bounds_p, data_p]: settlement_pfpr) {
+    for (const auto& data_p: settlement_pfpr) {
         if (data_p.overlap == Overlap::in || data_p.overlap == Overlap::on) {
             auto cpx = data_p.centroid_in.get<0>();
             bmin[0] = min(cpx, bmin[0]);
@@ -128,7 +138,7 @@ void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
     array<double, 2> scale = { max_val / (bmax[0] - bmin[0]), max_val / (bmax[1] - bmin[1])};
 
     std::vector<ipoint> points;
-    for (const auto& [pix_key, sd]: settlement_pfpr) {
+    for (const auto& sd: settlement_pfpr) {
         if (sd.overlap == Overlap::in || sd.overlap == Overlap::on) {
             auto cpx = sd.centroid_in.get<0>();
             auto cpy = sd.centroid_in.get<1>();
@@ -151,6 +161,8 @@ void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
     construct_voronoi(points.begin(), points.end(), segments.begin(), segments.end(), &vd);
 
     // Make a graph
+    using Graph=boost::adjacency_list<boost::listS, boost::vecS>;
+    Graph connection{settlement_pfpr.size()};
 
     for (auto& set_edge_unseen: vd.edges()) {
         if (set_edge_unseen.is_primary()) {
@@ -164,8 +176,16 @@ void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
             edge_iter.twin()->color(1);
             auto cell_a = edge_iter.cell()->source_index();
             auto cell_b = edge_iter.twin()->cell()->source_index();
+            if (cell_in_admin(settlement_pfpr, cell_a) && cell_in_admin(settlement_pfpr, cell_b)) {
+                auto [added_edge, added] = add_edge(cell_a, cell_b, connection);
+                if (!added) {
+                    cout << "not added " << cell_a << " " << cell_b << endl;
+                }
+            }
         }
     }
+
+    //boost::betweenness_centrality_clustering(connection)
 }
 
 
@@ -175,7 +195,7 @@ struct MPDelete {
 
 
 void CreatePatches(
-        OGRMultiPolygon* admin, map<array<int, 2>,PixelData>& settlement_pfpr,
+        OGRMultiPolygon* admin, vector<PixelData>& settlement_pfpr,
         const std::vector<double>& settlement_geo_transform
         )
 {

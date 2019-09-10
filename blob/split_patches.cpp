@@ -61,6 +61,7 @@ dmpolygon convert_gdal_to_boost(OGRMultiPolygon* gdal_poly) {
         }
         ++poly_idx;
     }
+    correct(dpoly);  // For orientation and whether it is properly closed.
     return dpoly;
 }
 
@@ -72,7 +73,6 @@ void split_patches_retaining_pfpr(
         shared_ptr<OGRCoordinateTransformation>& project
 ) {
     for (auto& pixel_iter: settlement_pfpr) {
-        dpolygon pixel_poly;
         // Apply the projection before making the new polygon.
         auto bounds = pixel_bounds<dpoint>(pixel_iter.first, settlement_geo_transform);
         for (auto& bound: bounds) {
@@ -82,7 +82,9 @@ void split_patches_retaining_pfpr(
             boost::geometry::set<0>(bound, bx);
             boost::geometry::set<1>(bound, by);
         }
-        append(pixel_poly, bounds);
+        dpolygon pixel_poly;
+        assign_points(pixel_poly, bounds);
+        correct(pixel_poly);
 
         // If the polygon is split by the side, get the centroid of the inner pieces
         // and the centroid of the outer pieces. That's enough for making patches.
@@ -95,52 +97,51 @@ void split_patches_retaining_pfpr(
         dpoint outside_centroid{pix_centroid};
         dpoint total_centroid(pix_centroid);
         bool does_overlap = overlaps(pixel_poly, admin_bg);
-        if (does_overlap) {
-            bool is_within = within(pixel_poly, admin_bg);
-            if (is_within) {
+        // within is the same as the covered() function for polygons.
+        bool is_within = within(pixel_poly, admin_bg);
+        if (is_within) {
+            pd.overlap = Overlap::in;
+            pd.area_in = total_area;
+            pd.centroid_in = pix_centroid;
+        } else if (does_overlap) {
+            deque<dpolygon> output;
+            intersection(pixel_poly, admin_bg, output);
+            double cx{0};
+            double cy{0};
+            for (const auto &geom: output) {
+                double part_area = area(geom);
+                intersect_area += part_area;
+                dpoint part_centroid;
+                centroid(geom, part_centroid);
+                cx += bg::get<0>(part_centroid) * part_area;
+                cy += bg::get<1>(part_centroid) * part_area;
+            }
+            bg::set<0>(pix_centroid, cx / intersect_area);
+            bg::set<1>(pix_centroid, cy / intersect_area);
+
+            const double small_overlap{0.01};
+            if (total_area - intersect_area > small_overlap * total_area) {
+                // The centroid of the outside can be computed from the total centroid and inside centroid.
+                bg::set<0>(
+                        outside_centroid,
+                        (bg::get<0>(total_centroid) * total_area
+                         - bg::get<0>(pix_centroid) * intersect_area) / (total_area - intersect_area)
+                );
+                bg::set<1>(
+                        outside_centroid,
+                        (bg::get<1>(total_centroid) * total_area
+                         - bg::get<1>(pix_centroid) * intersect_area) / (total_area - intersect_area)
+                );
+                pd.overlap = Overlap::on;
+                pd.area_in = intersect_area;
+                pd.centroid_in = pix_centroid;
+                pd.area_out = total_area - intersect_area;
+                pd.centroid_out = outside_centroid;
+            } else {
+                // The overlap is small, so fall back to including this pixel in one category.
                 pd.overlap = Overlap::in;
                 pd.area_in = total_area;
                 pd.centroid_in = pix_centroid;
-            } else {
-                deque<dpolygon> output;
-                intersection(pixel_poly, admin_bg, output);
-                double cx{0};
-                double cy{0};
-                for (const auto& geom: output) {
-                    double part_area = area(geom);
-                    intersect_area += part_area;
-                    dpoint part_centroid;
-                    centroid(geom, part_centroid);
-                    cx += bg::get<0>(part_centroid) * part_area;
-                    cy += bg::get<1>(part_centroid) * part_area;
-                }
-                bg::set<0>(pix_centroid, cx / intersect_area);
-                bg::set<1>(pix_centroid, cy / intersect_area);
-
-                const double small_overlap{0.01};
-                if (total_area - intersect_area > small_overlap * total_area) {
-                    // The centroid of the outside can be computed from the total centroid and inside centroid.
-                    bg::set<0>(
-                            outside_centroid,
-                            (bg::get<0>(total_centroid) * total_area
-                             - bg::get<0>(pix_centroid) * intersect_area) / (total_area - intersect_area)
-                    );
-                    bg::set<1>(
-                            outside_centroid,
-                            (bg::get<1>(total_centroid) * total_area
-                             - bg::get<1>(pix_centroid) * intersect_area) / (total_area - intersect_area)
-                    );
-                    pd.overlap = Overlap::on;
-                    pd.area_in = intersect_area;
-                    pd.centroid_in = pix_centroid;
-                    pd.area_out = total_area - intersect_area;
-                    pd.centroid_out = outside_centroid;
-                } else {
-                    // The overlap is small, so fall back to including this pixel in one category.
-                    pd.overlap = Overlap::in;
-                    pd.area_in = total_area;
-                    pd.centroid_in = pix_centroid;
-                }
             }
         } else {
             intersect_area = 0;

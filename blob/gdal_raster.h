@@ -86,12 +86,22 @@ namespace dd_harp {
  */
     template<typename POINTISH>
     std::vector<POINTISH> pixel_bounds(std::array<int, 2> pixel, const std::vector<double>& transform) {
-        return {
-                pixel_coord<POINTISH>(pixel, transform),
-                pixel_coord<POINTISH>({pixel[0], pixel[1] + 1}, transform),
-                pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
-                pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform)
-        };
+        bool right_handed_coordinate_system = (transform[1] * transform[5] > 0);
+        if (right_handed_coordinate_system) {
+            return {
+                    pixel_coord<POINTISH>(pixel, transform),
+                    pixel_coord<POINTISH>({pixel[0], pixel[1] + 1}, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform)
+            };
+        } else {
+            return {
+                    pixel_coord<POINTISH>(pixel, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
+                    pixel_coord<POINTISH>({pixel[0], pixel[1] + 1}, transform)
+            };
+        }
     }
 
 }

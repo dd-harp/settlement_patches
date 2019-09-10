@@ -1,6 +1,7 @@
 #include <cmath>
 #include <deque>
 #include <iostream>
+#include <limits>
 #include <memory>
 
 #include "boost/geometry.hpp"
@@ -110,19 +111,21 @@ void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
             bmin[0] = min(cpx, bmin[0]);
             bmax[0] = min(cpx, bmax[0]);
             auto cpy = data_p.centroid_in.get<1>();
-            bmin[1] = min(cpx, bmin[1]);
-            bmax[1] = min(cpx, bmax[1]);
-        }
-        if (data_p.overlap == Overlap::out || data_p.overlap == Overlap::on) {
+            bmin[1] = min(cpy, bmin[1]);
+            bmax[1] = min(cpy, bmax[1]);
+        } else if (data_p.overlap == Overlap::out) {
             auto cpx = data_p.centroid_out.get<0>();
             bmin[0] = min(cpx, bmin[0]);
             bmax[0] = min(cpx, bmax[0]);
             auto cpy = data_p.centroid_out.get<1>();
-            bmin[1] = min(cpx, bmin[1]);
-            bmax[1] = min(cpx, bmax[1]);
+            bmin[1] = min(cpy, bmin[1]);
+            bmax[1] = min(cpy, bmax[1]);
+        } else {
+            throw runtime_error("data overlap unknown");
         }
     }
-    array<double, 2> scale = { (1<<30) / (bmax[0] - bmin[0]), (1<<30) / (bmax[1] - bmin[1])};
+    const int max_val{std::numeric_limits<int>::max() - 1};
+    array<double, 2> scale = { max_val / (bmax[0] - bmin[0]), max_val / (bmax[1] - bmin[1])};
 
     std::vector<ipoint> points;
     for (const auto& [pix_key, sd]: settlement_pfpr) {
@@ -143,16 +146,24 @@ void create_neighbor_graph(map<array<int, 2>,PixelData>& settlement_pfpr) {
             });
         }
     }
-    std::vector<isegment> segments;
+    std::vector<isegment> segments;  // There are no input segments.
     voronoi_diagram<double> vd;
     construct_voronoi(points.begin(), points.end(), segments.begin(), segments.end(), &vd);
 
     // Make a graph
 
+    for (auto& set_edge_unseen: vd.edges()) {
+        if (set_edge_unseen.is_primary()) {
+            set_edge_unseen.color(0);
+        }
+    }
     // Walk edges to turn them into graph links.
-    for (auto edge_iter = vd.edges().begin(); edge_iter != vd.edges().end(); ++edge_iter) {
-        if (edge_iter->is_primary()) {
-            ;
+    for (auto& edge_iter: vd.edges()) {
+        if (edge_iter.is_primary() && edge_iter.color() == 0) {
+            edge_iter.color(1);
+            edge_iter.twin()->color(1);
+            auto cell_a = edge_iter.cell()->source_index();
+            auto cell_b = edge_iter.twin()->cell()->source_index();
         }
     }
 }

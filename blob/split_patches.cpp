@@ -140,6 +140,7 @@ void split_patches_retaining_pfpr(
                 pixel_data.overlap = Overlap::in;
                 pixel_data.area_in = total_area;
                 pixel_data.centroid_in = pix_centroid;
+                pixel_data.area_out = 0;
             }
         } else {
             pixel_data.overlap = Overlap::out;

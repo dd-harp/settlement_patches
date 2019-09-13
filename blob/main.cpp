@@ -150,13 +150,13 @@ int entry(int argc, char* argv[])
     OGRSpatialReference lat_long_srs(projection_ref);
     auto to_projected = reproject(&lat_long_srs);
 
-    auto admin_dataset = static_cast<GDALDataset *>(GDALOpenEx(
+    auto admin_dataset = GDALDatasetUniquePtr(static_cast<GDALDataset *>(GDALOpenEx(
             input_path.at("admin").c_str(),
             GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR,
             nullptr,
             nullptr,
             nullptr
-    ));
+    )), GDALDatasetUniquePtrDeleter());
     if (admin_dataset == nullptr) {
         cout << "Could not load dataset from " << input_path.at("admin") << endl;
         return 7;

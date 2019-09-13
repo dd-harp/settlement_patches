@@ -125,16 +125,19 @@ using GraphVertex=boost::graph_traits<Graph>::vertex_descriptor;
 struct centrality_done {
     int _partition_cnt;
     int _partition_idx;
-    explicit centrality_done(int partition_cnt) : _partition_cnt{partition_cnt}, _partition_idx{0} {}
+    double _maximum_centrality;
+    explicit centrality_done(int partition_cnt, double centrality)
+    : _partition_cnt{partition_cnt}, _partition_idx{0}, _maximum_centrality{centrality} {}
     centrality_done(const centrality_done&) = default;
 
     bool operator()(double maximum_centrality, GraphEdge edge_to_remove, const Graph& graph) {
-        bool done = (this->_partition_idx >= this->_partition_cnt);
+        bool steps_high = (this->_partition_idx >= this->_partition_cnt);
+        bool centrality_enough = (maximum_centrality < this->_maximum_centrality);
         this->_partition_idx++;
         cout << "centrality " << maximum_centrality << " "
             << edge_to_remove << " " << _partition_idx
-            << " partition_cnt " << this->_partition_cnt << " " << done << endl;
-        return done;
+            << " partition_cnt " << this->_partition_cnt << " " << centrality_enough << endl;
+        return steps_high || centrality_enough;
     }
 };
 
@@ -153,29 +156,31 @@ size_t component_count(const GRAPH& connection) {
 }
 
 
-void write_components(const vector<vector<size_t>>& components, const vector<PixelData>& settlement_pfpr) {
-    fstream csv{"components.csv", fstream::out};
+struct ComponentData
+{
+    double population;
+    double settlements;
+    double pfpr;
+    array<double, 2> lat_long;
+};
+
+
+void write_components(const vector<ComponentData>& component_data) {
+    fstream csv{"components.csv", fstream::out | fstream::app};
     int component_idx{0};
-    for (const auto& settlements: components) {
-        double pfpr{0};
-        double pop{0};
-        for (auto settle_idx: settlements) {
-            const PixelData& pd{settlement_pfpr.at(settle_idx)};
-            pop += pd.pop;
-            pfpr += pd.pfpr * pd.pop;
-        }
+    for (const auto& cd: component_data) {
         auto sep{", "};
-        csv << component_idx << sep << pop << sep << settlements.size() << sep
-            << pfpr / pop << endl;
+        csv << component_idx << sep << cd.population << sep << cd.settlements << sep
+            << cd.pfpr << endl;
         ++component_idx;
     }
 }
 
 
-void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
+Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     array<double, 2> bmin{numeric_limits<double>::max(), numeric_limits<double>::max()};
     array<double, 2> bmax{numeric_limits<double>::min(), numeric_limits<double>::min()};
-    for (const auto& data_p: settlement_pfpr) {
+    for (const auto &data_p: settlement_pfpr) {
         if (data_p.overlap == Overlap::in || data_p.overlap == Overlap::on) {
             auto cpx = data_p.centroid_in.get<0>();
             bmin[0] = min(cpx, bmin[0]);
@@ -195,11 +200,11 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
         }
     }
     const int max_val{std::numeric_limits<int>::max() - 1};
-    array<double, 2> scale = { max_val / (bmax[0] - bmin[0]), max_val / (bmax[1] - bmin[1])};
+    array<double, 2> scale = {max_val / (bmax[0] - bmin[0]), max_val / (bmax[1] - bmin[1])};
 
     std::vector<ipoint> points;
     int settlement_cnt{0};
-    for (const auto& sd: settlement_pfpr) {
+    for (const auto &sd: settlement_pfpr) {
         if (sd.overlap == Overlap::in || sd.overlap == Overlap::on) {
             auto cpx = sd.centroid_in.get<0>();
             auto cpy = sd.centroid_in.get<1>();
@@ -226,7 +231,7 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     map<size_t, size_t> settlement_idx_to_graph_idx;
     size_t remain_idx{0};
     size_t vector_idx{0};
-    for (const auto& pixel_read: settlement_pfpr) {
+    for (const auto &pixel_read: settlement_pfpr) {
         auto overlap = pixel_read.overlap;
         if (overlap == Overlap::in || overlap == Overlap::on) {
             settlement_idx_to_graph_idx[vector_idx] = remain_idx;
@@ -236,14 +241,14 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     }
 
     // Walk edges to turn them into graph links.
-    for (auto& set_edge_unseen: vd.edges()) {
+    for (auto &set_edge_unseen: vd.edges()) {
         if (set_edge_unseen.is_primary()) {
             set_edge_unseen.color(0);
         }
     }
     vector<pair<int, int>> edges;
     int edge_cnt{0};
-    for (auto& edge_iter: vd.edges()) {
+    for (auto &edge_iter: vd.edges()) {
         if (edge_iter.is_primary() && edge_iter.color() == 0) {
             edge_iter.color(1);
             edge_iter.twin()->color(1);
@@ -255,44 +260,48 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
             }
         }
     }
-    if (edge_cnt == 0 || settlement_cnt == 0) {
-        return;
-    }
-
     const size_t settlement_in_admin_cnt{settlement_idx_to_graph_idx.size()};
     Graph connection{
-        edges.begin(),
-        edges.end(),
-        settlement_in_admin_cnt,
-        edges.size()
+            edges.begin(),
+            edges.end(),
+            settlement_in_admin_cnt,
+            edges.size()
     };
-    for (const auto& conn_iter: settlement_idx_to_graph_idx) {
+    for (const auto &conn_iter: settlement_idx_to_graph_idx) {
         connection[conn_iter.second].index = conn_iter.first;
     }
+    return connection;
+}
+
+//void blah() {
+//
+//    const int settle_size{200};
+//    if (settlement_cnt > settle_size) {
+//        size_t component_cnt = component_count(connection);
+//        cout << "graph starts with " << component_cnt << " components" << endl;
+//        using VertexIndex=map<GraphVertex, int>;
+//        VertexIndex vertex_index;
+//        auto[vert_iter, vert_end] = vertices(connection);
+//        for (int vert_idx = 0; vert_iter != vert_end; ++vert_iter, ++vert_idx) {
+//            vertex_index[*vert_iter] = vert_idx;
+//        }
+//        int split_cnt = 50;
+//        auto doneness = centrality_done{split_cnt, std::pow(settle_size, 2)};
+//        using CentralityMap=map<GraphEdge, double>;
+//        CentralityMap centrality;
+//        boost::associative_property_map<CentralityMap> pcentrality{centrality};
+//        boost::associative_property_map<VertexIndex> pvertex_index{vertex_index};
+//        cout << "centrality start " << edge_cnt << " edges "
+//             << split_cnt << " verts " << settlement_cnt << endl;
+//        boost::betweenness_centrality_clustering(connection, doneness, pcentrality, pvertex_index);
+//        cout << "splits " << doneness._partition_idx << " splits" << endl;
+//    }
+//}
 
 
-    const int settle_size{500};
-    if (settlement_cnt > settle_size) {
-        size_t component_cnt = component_count(connection);
-        cout << "graph starts with " << component_cnt << " components" << endl;
-        using VertexIndex=map<GraphVertex, int>;
-        VertexIndex vertex_index;
-        auto[vert_iter, vert_end] = vertices(connection);
-        for (int vert_idx = 0; vert_iter != vert_end; ++vert_iter, ++vert_idx) {
-            vertex_index[*vert_iter] = vert_idx;
-        }
-        int split_cnt = settlement_cnt / settle_size;
-        auto doneness = centrality_done{split_cnt};
-        using CentralityMap=map<GraphEdge, double>;
-        CentralityMap centrality;
-        boost::associative_property_map<CentralityMap> pcentrality{centrality};
-        boost::associative_property_map<VertexIndex> pvertex_index{vertex_index};
-        cout << "centrality start " << edge_cnt << " edges "
-            << split_cnt << " verts " << settlement_cnt << endl;
-        boost::betweenness_centrality_clustering(connection, doneness, pcentrality, pvertex_index);
-        cout << "splits " << doneness._partition_idx << " splits" << endl;
-    }
-
+vector<ComponentData>
+properties_of_components(Graph& connection, vector<PixelData>& settlement_pfpr)
+{
     map<GraphVertex, size_t> component_map;
     boost::associative_property_map<map<GraphVertex, size_t>> pcomponent_map{component_map};
     boost::connected_components(connection, pcomponent_map);
@@ -306,7 +315,24 @@ void create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     for (const auto& settle: component_map) {
         components.at(settle.second).push_back(settle.first);
     }
-    write_components(components, settlement_pfpr);
+    int component_idx{0};
+    vector<ComponentData> component_data{component_cnt};
+    for (const auto& settlements: components) {
+        double pfpr{0};
+        double pop{0};
+        for (auto settle_idx: settlements) {
+            const PixelData& pd{settlement_pfpr.at(settle_idx)};
+            pop += pd.pop;
+            pfpr += pd.pfpr * pd.pop;
+        }
+        component_data.at(component_idx).population = pop;
+        component_data.at(component_idx).pfpr = pfpr / pop;
+        component_data.at(component_idx).settlements = settlements.size();
+        component_data.at(component_idx).lat_long = {0, 0};
+
+        ++component_idx;
+    }
+    return component_data;
 }
 
 
@@ -334,9 +360,10 @@ void CreatePatches(
     split_patches_retaining_pfpr(settlement_pfpr, settlement_geo_transform, admin_bg, project);
 
     // Should return a graph with an index into settlement_pfpr.
-    create_neighbor_graph(settlement_pfpr);
-
+    auto graph = create_neighbor_graph(settlement_pfpr);
     // Cluster on the graph, excluding nodes that are outside the polygon.
+    auto component_data = properties_of_components(graph, settlement_pfpr);
+    write_components(component_data);
 }
 
 }

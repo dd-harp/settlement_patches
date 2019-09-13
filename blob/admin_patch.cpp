@@ -20,7 +20,9 @@
 #include "admin_patch.h"
 #include "gdal_raster.h"
 #include "component_data.h"
+#include "metis_io.h"
 #include "on_demand_raster.h"
+#include "patch_graph.h"
 #include "projection.h"
 #include "split_patches.h"
 #include "sparse_settlements.h"
@@ -115,13 +117,6 @@ bool cell_in_admin(vector<PixelData>& pixel_data, size_t idx) {
     return relation == Overlap::in || relation == Overlap::on;
 }
 
-struct PatchDescription {
-    size_t index;  // Tells us which settlement this is.
-};
-
-using PatchGraph=boost::adjacency_list<boost::listS, boost::vecS, boost::undirectedS, PatchDescription>;
-using PatchGraphEdge=boost::graph_traits<PatchGraph>::edge_descriptor;
-using PatchGraphVertex=boost::graph_traits<PatchGraph>::vertex_descriptor;
 
 struct centrality_done {
     int _partition_cnt;
@@ -364,6 +359,8 @@ CreatePatches(
     // Should return a graph with an index into settlement_pfpr.
     auto graph = create_neighbor_graph(settlement_pfpr);
     // Cluster on the graph, excluding nodes that are outside the polygon.
+    write_for_metis(graph, settlement_pfpr);
+
     auto component_data = properties_of_components(graph, settlement_pfpr);
     for (auto& pixel_data_transform: component_data) {
         unproject->Transform(1, &pixel_data_transform.centroid_lat_long[0], &pixel_data_transform.centroid_lat_long[1]);

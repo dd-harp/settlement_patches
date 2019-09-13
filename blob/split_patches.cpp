@@ -88,65 +88,67 @@ void split_patches_retaining_pfpr(
 
         // If the polygon is split by the side, get the centroid of the inner pieces
         // and the centroid of the outer pieces. That's enough for making patches.
-        double intersect_area{0};
-        double total_area{area(pixel_poly)};
-        dpoint pix_centroid{0, 0};
-        centroid(pixel_poly, pix_centroid);
-        dpoint outside_centroid{pix_centroid};
-        dpoint total_centroid(pix_centroid);
+        double total_area = area(pixel_poly);
+        pixel_data.area_in = total_area;
+        pixel_data.area_out = total_area;
+        dpoint total_centroid{0, 0};
+        centroid(pixel_poly, total_centroid);
+        pixel_data.centroid_in = total_centroid;
+        pixel_data.centroid_out = total_centroid;
+
         bool does_overlap = overlaps(pixel_poly, admin_bg);
         // within is the same as the covered() function for polygons.
         bool is_within = within(pixel_poly, admin_bg);
         if (is_within) {
             pixel_data.overlap = Overlap::in;
-            pixel_data.area_in = total_area;
-            pixel_data.centroid_in = pix_centroid;
+            pixel_data.area_out = 0;
         } else if (does_overlap) {
             deque<dpolygon> output;
             intersection(pixel_poly, admin_bg, output);
             double cx{0};
             double cy{0};
+            pixel_data.area_in = 0;
             for (const auto &geom: output) {
                 double part_area = area(geom);
-                intersect_area += part_area;
+                pixel_data.area_in += part_area;
                 dpoint part_centroid;
                 centroid(geom, part_centroid);
                 cx += bg::get<0>(part_centroid) * part_area;
                 cy += bg::get<1>(part_centroid) * part_area;
             }
-            bg::set<0>(pix_centroid, cx / intersect_area);
-            bg::set<1>(pix_centroid, cy / intersect_area);
+            bg::set<0>(pixel_data.centroid_in, cx / pixel_data.area_in);
+            bg::set<1>(pixel_data.centroid_in, cy / pixel_data.area_in);
 
             const double small_overlap{0.01};
-            if (total_area - intersect_area > small_overlap * total_area) {
+            if (total_area - pixel_data.area_in > small_overlap * total_area) {
                 // The centroid of the outside can be computed from the total centroid and inside centroid.
                 bg::set<0>(
-                        outside_centroid,
+                        pixel_data.centroid_out,
                         (bg::get<0>(total_centroid) * total_area
-                         - bg::get<0>(pix_centroid) * intersect_area) / (total_area - intersect_area)
+                         - bg::get<0>(pixel_data.centroid_in) * pixel_data.area_in) / (total_area - pixel_data.area_in)
                 );
                 bg::set<1>(
-                        outside_centroid,
+                        pixel_data.centroid_out,
                         (bg::get<1>(total_centroid) * total_area
-                         - bg::get<1>(pix_centroid) * intersect_area) / (total_area - intersect_area)
+                         - bg::get<1>(pixel_data.centroid_in) * pixel_data.area_in) / (total_area - pixel_data.area_in)
                 );
                 pixel_data.overlap = Overlap::on;
-                pixel_data.area_in = intersect_area;
-                pixel_data.centroid_in = pix_centroid;
-                pixel_data.area_out = total_area - intersect_area;
-                pixel_data.centroid_out = outside_centroid;
+                pixel_data.area_out = total_area - pixel_data.area_in;
             } else {
                 // The overlap is small, so fall back to including this pixel in one category.
                 pixel_data.overlap = Overlap::in;
                 pixel_data.area_in = total_area;
-                pixel_data.centroid_in = pix_centroid;
                 pixel_data.area_out = 0;
             }
         } else {
             pixel_data.overlap = Overlap::out;
             pixel_data.area_in = 0;
-            pixel_data.area_out = total_area;
-            pixel_data.centroid_out = pix_centroid;
+        }
+        if (not within(pixel_data.centroid_in, pixel_poly)) {
+            throw runtime_error("centroid not within pixel");
+        }
+        if (not within(pixel_data.centroid_out, pixel_poly)) {
+            throw runtime_error("centroid not within pixel");
         }
     }
 }

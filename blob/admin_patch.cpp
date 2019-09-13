@@ -316,10 +316,12 @@ properties_of_components(Graph& connection, vector<PixelData>& settlement_pfpr)
         array<double, 2> xy{0, 0};
         for (auto settle_idx: settlements) {
             const PixelData& pd{settlement_pfpr.at(settle_idx)};
-            pop += pd.pop;
-            pfpr += pd.pfpr * pd.pop;
-            xy[0] += bg::get<0>(pd.centroid_in) * pd.area_in * pd.pop / (pd.area_out + pd.area_in);
-            xy[1] += bg::get<1>(pd.centroid_in) * pd.area_in * pd.pop / (pd.area_out + pd.area_in);
+            // Because pop is for the whole settlement, including the part outside.
+            double add_pop = pd.area_in * pd.pop / (pd.area_out + pd.area_in);
+            pop += add_pop;
+            pfpr += pd.pfpr * add_pop;
+            xy[0] += bg::get<0>(pd.centroid_in) * add_pop;
+            xy[1] += bg::get<1>(pd.centroid_in) * add_pop;
         }
         xy[0] /= pop;
         xy[1] /= pop;

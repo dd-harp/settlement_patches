@@ -178,7 +178,7 @@ int entry(int argc, char* argv[])
     vector<ComponentData> components;
     first_admin_layer->ResetReading();
     OGRFeature* geom_feature = first_admin_layer->GetNextFeature();
-    const int feature_cnt{2};
+    const int feature_cnt{10};
     for (
             int feature_idx=0;
             (geom_feature != nullptr) && (feature_idx != feature_cnt);

@@ -150,6 +150,9 @@ void split_patches_retaining_pfpr(
         if (not within(pixel_data.centroid_out, pixel_poly)) {
             throw runtime_error("centroid not within pixel");
         }
+        if (abs(pixel_data.area_out + pixel_data.area_in - total_area) > 1e-6) {
+            throw runtime_error("total area does not add up.");
+        }
     }
 }
 }

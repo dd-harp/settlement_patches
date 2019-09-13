@@ -191,8 +191,8 @@ Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
             throw runtime_error("data overlap unknown");
         }
     }
-    const int max_val{std::numeric_limits<int>::max() - 1};
-    array<double, 2> scale = {max_val / (bmax[0] - bmin[0]), max_val / (bmax[1] - bmin[1])};
+    const int max_val{std::numeric_limits<int>::max() / 2};
+    double scale = max_val / max(bmax[0] - bmin[0], bmax[1] - bmin[1]);
 
     std::vector<ipoint> points;
     int settlement_cnt{0};
@@ -201,17 +201,18 @@ Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
             auto cpx = sd.centroid_in.get<0>();
             auto cpy = sd.centroid_in.get<1>();
             points.emplace_back(ipoint{
-                    static_cast<int>(lround((cpx - bmin[0]) * scale[0])),
-                    static_cast<int>(lround((cpy - bmin[1]) * scale[1]))
+                    static_cast<int>(lround((cpx - bmin[0]) * scale)),
+                    static_cast<int>(lround((cpy - bmin[1]) * scale))
             });
             ++settlement_cnt;
         }
-        if (sd.overlap == Overlap::out || sd.overlap == Overlap::on) {
+        // Removing the partial points that are outside the bounds.
+        if (sd.overlap == Overlap::out) {
             auto cpx = sd.centroid_out.get<0>();
             auto cpy = sd.centroid_out.get<1>();
             points.emplace_back(ipoint{
-                    static_cast<int>(lround((cpx - bmin[0]) * scale[0])),
-                    static_cast<int>(lround((cpy - bmin[1]) * scale[1]))
+                    static_cast<int>(lround((cpx - bmin[0]) * scale)),
+                    static_cast<int>(lround((cpy - bmin[1]) * scale))
             });
         }
     }

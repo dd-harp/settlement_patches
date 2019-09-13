@@ -1,7 +1,3 @@
-//
-// Created by adolgert on 8/7/19.
-//
-
 #ifndef BLOB_PIXEL_H
 #define BLOB_PIXEL_H
 

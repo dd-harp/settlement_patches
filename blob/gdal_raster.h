@@ -3,17 +3,18 @@
 
 #include <array>
 #include <exception>
-#include <filesystem>
 #include <sstream>
 #include <vector>
 
+#include "boost/filesystem.hpp"
 #include "CGAL/Exact_predicates_inexact_constructions_kernel.h"
+
 #include "gdal/gdal_priv.h"
 #include "gdal/cpl_conv.h"
 
 
-namespace spacepop {
-    std::shared_ptr<GDALDataset>  OpenGeoTiff(const std::filesystem::path& tiff_file);
+namespace dd_harp {
+    std::shared_ptr<GDALDataset>  OpenGeoTiff(const boost::filesystem::path& tiff_file);
 
     template<typename PointOutputIterator>
     void gdal_raster_points(PointOutputIterator out, GDALRasterBand *band, double cutoff, int corner = 0) {
@@ -65,6 +66,44 @@ namespace spacepop {
             }
         }
     }
+
+
+//! Convert a lat-long into a specific pixel.
+    std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform);
+
+//! Convert a pixel corner into a long-lat
+    template<typename POINTISH>
+    POINTISH pixel_coord(std::array<int, 2> pixel, const std::vector<double>& transform) {
+        return {
+                transform.at(0) + pixel[0] * transform.at(1) + pixel[1] * transform.at(2),
+                transform.at(3) + pixel[0] * transform.at(4) + pixel[1] * transform.at(5)
+        };
+    }
+
+
+/*! Convert a pixel into its four corners as long-lat.
+ *  Boost::polygon likes to be clockwise, so these are clockwise.
+ */
+    template<typename POINTISH>
+    std::vector<POINTISH> pixel_bounds(std::array<int, 2> pixel, const std::vector<double>& transform) {
+        bool right_handed_coordinate_system = (transform[1] * transform[5] > 0);
+        if (right_handed_coordinate_system) {
+            return {
+                    pixel_coord<POINTISH>(pixel, transform),
+                    pixel_coord<POINTISH>({pixel[0], pixel[1] + 1}, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform)
+            };
+        } else {
+            return {
+                    pixel_coord<POINTISH>(pixel, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1]}, transform),
+                    pixel_coord<POINTISH>({pixel[0] + 1, pixel[1] + 1}, transform),
+                    pixel_coord<POINTISH>({pixel[0], pixel[1] + 1}, transform)
+            };
+        }
+    }
+
 }
 
 #endif //BLOB_GDAL_RASTER_H

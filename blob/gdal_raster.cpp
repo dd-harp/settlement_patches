@@ -4,9 +4,9 @@
 #include "gdal_raster.h"
 
 using namespace std;
-namespace fs = std::filesystem;
+namespace fs = boost::filesystem;
 
-namespace spacepop {
+namespace dd_harp {
 
     struct DatasetClose {
         void operator()(GDALDataset* ds) const {
@@ -14,7 +14,7 @@ namespace spacepop {
         }
     };
 
-    shared_ptr<GDALDataset> OpenGeoTiff(const std::filesystem::path &geotiff_filename) {
+    shared_ptr<GDALDataset> OpenGeoTiff(const boost::filesystem::path &geotiff_filename) {
 
         auto parent_directory = geotiff_filename.parent_path();
         auto file_stem = geotiff_filename.stem().string();
@@ -67,4 +67,12 @@ namespace spacepop {
         }
         return shared_ptr<GDALDataset>(dataset, DatasetClose());
     }
+
+    std::array<int, 2> pixel_containing(std::array<double, 2> coord, const std::vector<double>& transform) {
+        return {
+                static_cast<int>(std::lround(std::floor((1 / transform[1]) * (coord[0] - transform[0])))),
+                static_cast<int>(std::lround(std::floor((1 / transform[5]) * (coord[1] - transform[3]))))
+        };
+    }
+
 }

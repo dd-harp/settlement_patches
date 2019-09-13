@@ -1,13 +1,9 @@
-//
-// Created by adolgert on 8/7/19.
-//
-
 #ifndef BLOB_READ_TIFF_H
 #define BLOB_READ_TIFF_H
 
 #include <CGAL/Cartesian/Cartesian_base.h>
 
-namespace spacepop {
+namespace dd_harp {
 
 template<typename TIFFTYPE>
 std::vector<uint32> ImageSizes(TIFFTYPE* tif) {

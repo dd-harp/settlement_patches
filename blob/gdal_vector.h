@@ -9,7 +9,9 @@
 
 namespace dd_harp {
     void OpenShapefile(const boost::filesystem::path &shapefile_path);
-    void WriteVector(const boost::filesystem::path &shape_filename);
+
+    class ComponentData;
+    void WriteVector(const boost::filesystem::path &shape_filename, const std::vector<ComponentData>& patch);
 }
 
 #endif //BLOB_GDAL_VECTOR_H

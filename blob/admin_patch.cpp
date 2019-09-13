@@ -19,6 +19,7 @@
 
 #include "admin_patch.h"
 #include "gdal_raster.h"
+#include "component_data.h"
 #include "on_demand_raster.h"
 #include "projection.h"
 #include "split_patches.h"
@@ -154,16 +155,6 @@ size_t component_count(const GRAPH& connection) {
     }
     return component_cnt.size();
 }
-
-
-struct ComponentData
-{
-    double population;
-    double settlements;
-    double pfpr;
-    array<double, 2> centroid_projected;
-    array<double, 2> centroid_lat_long;
-};
 
 
 void write_components(const vector<ComponentData>& component_data) {
@@ -348,7 +339,8 @@ struct MPDelete {
 };
 
 
-void CreatePatches(
+vector<ComponentData>
+CreatePatches(
         OGRMultiPolygon* admin, vector<PixelData>& settlement_pfpr,
         const std::vector<double>& settlement_geo_transform
         )
@@ -374,6 +366,7 @@ void CreatePatches(
         unproject->Transform(1, &pixel_data_transform.centroid_lat_long[0], &pixel_data_transform.centroid_lat_long[1]);
     }
     write_components(component_data);
+    return component_data;
 }
 
 }

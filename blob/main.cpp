@@ -8,7 +8,9 @@
 #include "gtest/gtest.h"
 
 #include "admin_patch.h"
+#include "component_data.h"
 #include "gdal_raster.h"
+#include "gdal_vector.h"
 #include "on_demand_raster.h"
 #include "projection.h"
 #include "sparse_settlements.h"
@@ -173,9 +175,17 @@ int entry(int argc, char* argv[])
     OGRLayer* first_admin_layer = *admin_dataset->GetLayers().begin();
     OGRMultiPolygon mp_buffer;
     int poly_idx{0};
-    for (auto& admin_geometry: first_admin_layer) {
+    vector<ComponentData> components;
+    first_admin_layer->ResetReading();
+    OGRFeature* geom_feature = first_admin_layer->GetNextFeature();
+    const int feature_cnt{2};
+    for (
+            int feature_idx=0;
+            (geom_feature != nullptr) && (feature_idx != feature_cnt);
+            ++feature_idx, geom_feature = first_admin_layer->GetNextFeature()
+                    ) {
         cout << "polygon " << poly_idx << endl;
-        auto geometry = admin_geometry->GetGeometryRef();  // reference, not owned
+        auto geometry = geom_feature->GetGeometryRef();  // reference, not owned
         if (geometry != nullptr) {
             auto geometry_type = geometry->getGeometryType();
             if (geometry_type != wkbPolygon && geometry_type != wkbMultiPolygon) {
@@ -194,8 +204,10 @@ int entry(int argc, char* argv[])
             vector<PixelData> settlement_pfpr = sparse_settlements(
                     settlement_arr, pfpr_arr, multi_polygon, settlement_geo_transform, population_cutoff
             );
-            CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);
-
+            auto patch_components = CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);
+            std::copy(patch_components.begin(), patch_components.end(),
+                    back_inserter(components)
+                    );
             if (geometry_type == wkbPolygon) {
                 bool do_not_delete{false};  // because it belongs to the layer.
                 mp_buffer.removeGeometry(0, do_not_delete);
@@ -205,6 +217,7 @@ int entry(int argc, char* argv[])
         }
         ++poly_idx;
     }
+    WriteVector("ug_patches.shp", components);
 
     return 0;
 //    std::vector<Point> points;

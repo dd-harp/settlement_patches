@@ -3,6 +3,7 @@
 
 #include "gdal/ogrsf_frmts.h"
 
+#include "component_data.h"
 #include "gdal_vector.h"
 
 
@@ -102,15 +103,25 @@ namespace dd_harp {
     }
 
 
-    void WriteVector(const boost::filesystem::path &shape_filename) {
+    struct FeatureDeleter
+    {
+        void operator()(OGRFeature* f) { OGRFeature::DestroyFeature(f); }
+    };
+
+
+    void WriteVector(const boost::filesystem::path &shape_filename, const std::vector<ComponentData>& patch) {
         // https://gdal.org/tutorials/vector_api_tut.html#writing-to-ogr
-        GDALDriver *shapefile_driver = GetGDALDriverManager()->GetDriverByName("GTiff");
+        const char *pszDriverName = "ESRI Shapefile";
+        GDALDriver *shapefile_driver = GetGDALDriverManager()->GetDriverByName(pszDriverName);
         if (shapefile_driver == nullptr) {
             throw std::runtime_error("Could not load GeoTIFF driver in GDAL.");
         }
-        GDALDataset* ds = shapefile_driver->Create(
+        if (shape_filename.extension() != ".shp") {
+            throw std::runtime_error("Shape filename does not end in shp");
+        }
+        auto ds = GDALDatasetUniquePtr(shapefile_driver->Create(
                 shape_filename.c_str(), 0, 0, 0, GDT_Unknown, nullptr
-        );
+        ), GDALDatasetUniquePtrDeleter());
         if (ds == nullptr) {
             throw std::runtime_error("Could not create dataset");
         }
@@ -119,5 +130,29 @@ namespace dd_harp {
             throw std::runtime_error("Could not create layer.");
         }
 
+        OGRFieldDefn population_field("Population", OFTReal);
+        auto pop_create = layer->CreateField(&population_field);
+        if (pop_create != OGRERR_NONE) {
+            throw std::runtime_error("Could not create population field");
+        }
+        OGRFieldDefn pfpr_field("PfPR", OFTReal);
+        auto pfpr_create = layer->CreateField(&pfpr_field);
+        if (pfpr_create != OGRERR_NONE) {
+            throw std::runtime_error("Could not create PfPR field");
+        }
+
+        for (const auto& patch_description: patch) {
+            OGRPoint pt;
+            pt.setX(patch_description.centroid_lat_long[0]);
+            pt.setY(patch_description.centroid_lat_long[1]);
+
+            auto feature = std::unique_ptr<OGRFeature, FeatureDeleter>(
+                    static_cast<OGRFeature*>(OGRFeature::CreateFeature(layer->GetLayerDefn()))
+            );
+            feature->SetGeometry(&pt);
+            if (layer->CreateFeature(feature.get()) != OGRERR_NONE) {
+                throw runtime_error("Could not create feature in layer.");
+            }
+        }
     }
 }

@@ -32,7 +32,7 @@ namespace dd_harp
     std::vector<ComponentData> CreatePatches(
             OGRMultiPolygon* admin, std::vector<PixelData>& settlement_pfpr,
             const std::vector<double>& settlement_geo_transform,
-            int population_per_patch
+            double population_per_patch
             );
 }
 

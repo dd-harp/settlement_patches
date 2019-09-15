@@ -20,8 +20,8 @@ namespace dd_harp
      * @return The outer vector is over patches. Each inner vector lists which
      *         settlments are in that patch.
      */
-    std::vector<std::vector<int>> split_with_metis(
-            const PatchGraph& graph, std::vector<PixelData>& settlement_pfpr, int population_per_patch
+    std::vector<std::vector<size_t>> split_with_metis(
+            const PatchGraph& graph, std::vector<PixelData>& settlement_pfpr, double population_per_patch
             );
 }
 

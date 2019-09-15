@@ -287,24 +287,33 @@ PatchGraph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
 //}
 
 
-vector<ComponentData>
-properties_of_components(PatchGraph& connection, vector<PixelData>& settlement_pfpr)
-{
+vector<vector<size_t>>
+connected_connections(PatchGraph& connection) {
     map<PatchGraphVertex, size_t> component_map;
     boost::associative_property_map<map<PatchGraphVertex, size_t>> pcomponent_map{component_map};
     boost::connected_components(connection, pcomponent_map);
 
     size_t component_cnt{0};
-    for (const auto& how_many: component_map) {
+    for (const auto &how_many: component_map) {
         component_cnt = std::max(component_cnt, how_many.second + 1);
     }
 
     vector<vector<size_t>> components{component_cnt};
-    for (const auto& settle: component_map) {
+    for (const auto &settle: component_map) {
         components.at(settle.second).push_back(settle.first);
     }
+    return components;
+}
+
+
+vector<ComponentData>
+properties_of_components(
+        const vector<vector<size_t>>& components,
+        vector<PixelData>& settlement_pfpr
+        )
+{
     int component_idx{0};
-    vector<ComponentData> component_data{component_cnt};
+    vector<ComponentData> component_data{components.size()};
     for (const auto& settlements: components) {
         double pfpr{0};
         double pop{0};
@@ -340,7 +349,7 @@ struct MPDelete {
 vector<ComponentData>
 CreatePatches(
         OGRMultiPolygon* admin, vector<PixelData>& settlement_pfpr,
-        const std::vector<double>& settlement_geo_transform, int population_per_patch
+        const std::vector<double>& settlement_geo_transform, double population_per_patch
         )
 {
     // Work in projection where units are meters.
@@ -361,7 +370,7 @@ CreatePatches(
     // Cluster on the graph, excluding nodes that are outside the polygon.
     auto grouped = split_with_metis(graph, settlement_pfpr, population_per_patch);
 
-    auto component_data = properties_of_components(graph, settlement_pfpr);
+    auto component_data = properties_of_components(grouped, settlement_pfpr);
     for (auto& pixel_data_transform: component_data) {
         unproject->Transform(1, &pixel_data_transform.centroid_lat_long[0], &pixel_data_transform.centroid_lat_long[1]);
     }

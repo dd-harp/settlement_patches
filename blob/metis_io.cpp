@@ -13,8 +13,8 @@ using namespace std;
 
 namespace dd_harp
 {
-    vector<vector<int>>
-    split_with_metis(const PatchGraph& graph, std::vector<PixelData>& settlement_pfpr, int population_per_patch)
+    vector<vector<size_t>>
+    split_with_metis(const PatchGraph& graph, std::vector<PixelData>& settlement_pfpr, double population_per_patch)
     {
         const auto graph_name{"graph.metis"s};
         fstream graph_file{graph_name, fstream::out};
@@ -57,7 +57,7 @@ namespace dd_harp
         cout << "running " << cmd.str() << endl;
         system(cmd.str().c_str());
 
-        vector<vector<int>> groups{partition_cnt};
+        vector<vector<size_t>> groups{partition_cnt};
 
         stringstream metis_out;
         metis_out << "graph.metis.part." << partition_cnt;
@@ -65,7 +65,7 @@ namespace dd_harp
         auto [in_vert, in_vert_end] = vertices(graph);
         int settle_input_idx{1};
         for (; in_vert != in_vert_end; ++in_vert) {
-            int part_idx{0};
+            size_t part_idx{0};
             in_file >> part_idx;
             groups.at(part_idx).push_back(graph[*in_vert].index);
             ++settle_input_idx;

@@ -1,4 +1,5 @@
 #include <iterator>
+#include <sstream>
 
 #include "boost/geometry.hpp"
 #include "boost/geometry/geometries/point_xy.hpp"
@@ -22,6 +23,14 @@ using dpoint = model::d2::point_xy<double>;
 using dpolygon = model::polygon<dpoint>;
 
 namespace dd_harp {
+
+    std::ostream& operator<<(std::ostream& os, const dpoint& p) {
+        return os << boost::geometry::wkt(p);
+    }
+
+    std::ostream& operator<<(std::ostream& os, const dpolygon& p) {
+        return os << boost::geometry::wkt(p);
+    }
 
 //! Copies a OGRLineString to a Boost linestring, reversing points if necessary.
 template<typename RING>
@@ -116,39 +125,49 @@ void split_patches_retaining_pfpr(
                 cx += bg::get<0>(part_centroid) * part_area;
                 cy += bg::get<1>(part_centroid) * part_area;
             }
-            bg::set<0>(pixel_data.centroid_in, cx / pixel_data.area_in);
-            bg::set<1>(pixel_data.centroid_in, cy / pixel_data.area_in);
-
             const double small_overlap{0.01};
-            if (total_area - pixel_data.area_in > small_overlap * total_area) {
-                // The centroid of the outside can be computed from the total centroid and inside centroid.
-                bg::set<0>(
-                        pixel_data.centroid_out,
-                        (bg::get<0>(total_centroid) * total_area
-                         - bg::get<0>(pixel_data.centroid_in) * pixel_data.area_in) / (total_area - pixel_data.area_in)
-                );
-                bg::set<1>(
-                        pixel_data.centroid_out,
-                        (bg::get<1>(total_centroid) * total_area
-                         - bg::get<1>(pixel_data.centroid_in) * pixel_data.area_in) / (total_area - pixel_data.area_in)
-                );
-                pixel_data.overlap = Overlap::on;
-                pixel_data.area_out = total_area - pixel_data.area_in;
+            if (pixel_data.area_in > small_overlap * total_area) {
+                bg::set<0>(pixel_data.centroid_in, cx / pixel_data.area_in);
+                bg::set<1>(pixel_data.centroid_in, cy / pixel_data.area_in);
+                if (total_area - pixel_data.area_in > small_overlap * total_area) {
+                    // The centroid of the outside can be computed from the total centroid and inside centroid.
+                    bg::set<0>(
+                            pixel_data.centroid_out,
+                            (bg::get<0>(total_centroid) * total_area
+                             - bg::get<0>(pixel_data.centroid_in) * pixel_data.area_in) /
+                            (total_area - pixel_data.area_in)
+                    );
+                    bg::set<1>(
+                            pixel_data.centroid_out,
+                            (bg::get<1>(total_centroid) * total_area
+                             - bg::get<1>(pixel_data.centroid_in) * pixel_data.area_in) /
+                            (total_area - pixel_data.area_in)
+                    );
+                    pixel_data.overlap = Overlap::on;
+                    pixel_data.area_out = total_area - pixel_data.area_in;
+                } else {
+                    // The overlap is small, so fall back to including this pixel in one category.
+                    pixel_data.overlap = Overlap::in;
+                    pixel_data.area_in = total_area;
+                    pixel_data.area_out = 0;
+                }
             } else {
-                // The overlap is small, so fall back to including this pixel in one category.
-                pixel_data.overlap = Overlap::in;
-                pixel_data.area_in = total_area;
-                pixel_data.area_out = 0;
+                pixel_data.overlap = Overlap::out;
+                pixel_data.area_in = 0;
             }
         } else {
             pixel_data.overlap = Overlap::out;
             pixel_data.area_in = 0;
         }
         if (not within(pixel_data.centroid_in, pixel_poly)) {
-            throw runtime_error("centroid not within pixel");
+            stringstream msg;
+            msg << "centroid in not within pixel, centroid: " << pixel_data.centroid_in << " " << pixel_poly;
+            throw runtime_error(msg.str());
         }
         if (not within(pixel_data.centroid_out, pixel_poly)) {
-            throw runtime_error("centroid not within pixel");
+            stringstream msg;
+            msg << "centroid out not within pixel, centroid: " << pixel_data.centroid_out << " " << pixel_poly;
+            throw runtime_error(msg.str());
         }
         if (abs(pixel_data.area_out + pixel_data.area_in - total_area) > 1e-6) {
             throw runtime_error("total area does not add up.");

@@ -52,7 +52,7 @@ po::options_description parser(const map<string,fs::path>& path_argument)
 
 /*! Given command line args, assign file paths, using defaults.
  *
- * @param vm Variables initialized from teh command line.
+ * @param vm Variables initialized from the command line.
  * @param input_path A map from a keyword to a default filename for each file type.
  * @return Whether all the input files specified as defaults or on command line do exist.
  */

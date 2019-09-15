@@ -13,7 +13,8 @@ using namespace std;
 
 namespace dd_harp
 {
-    vector<vector<int>> write_for_metis(const PatchGraph& graph, std::vector<PixelData>& settlement_pfpr)
+    vector<vector<int>>
+    split_with_metis(const PatchGraph& graph, std::vector<PixelData>& settlement_pfpr, int population_per_patch)
     {
         const auto graph_name{"graph.metis"s};
         fstream graph_file{graph_name, fstream::out};
@@ -26,6 +27,7 @@ namespace dd_harp
         graph_file << vert_cnt << sep << edge_cnt << sep << vertex_and_edge_weights << endl;
 
         int settle_idx{1};
+        double total_population{0};
         auto [vert, vert_end] = vertices(graph);
         for (; vert != vert_end; ++vert) {
             const PixelData& pd{settlement_pfpr[graph[*vert].index]};
@@ -33,6 +35,7 @@ namespace dd_harp
                 << pd.pop << sep << pd.pfpr << sep
                 << pd.centroid_in.get<0>() << sep << pd.centroid_in.get<1>() << endl;
             ++settle_idx;
+            total_population += pd.pop;
 
             graph_file << max(1l, lround(pd.pop)) << sep;
             auto [out, out_end] = out_edges(*vert, graph);
@@ -47,14 +50,18 @@ namespace dd_harp
             graph_file << endl;
         }
 
+        size_t partition_cnt = max(1l, lround(total_population / population_per_patch));
+
         stringstream cmd;
-        cmd << "gpmetis " << graph_name << " " << 10;
+        cmd << "gpmetis " << graph_name << " " << partition_cnt;
         cout << "running " << cmd.str() << endl;
         system(cmd.str().c_str());
 
-        vector<vector<int>> groups{10};
+        vector<vector<int>> groups{partition_cnt};
 
-        fstream in_file("graph.metis.part.10", fstream::in);
+        stringstream metis_out;
+        metis_out << "graph.metis.part." << partition_cnt;
+        fstream in_file(metis_out.str(), fstream::in);
         auto [in_vert, in_vert_end] = vertices(graph);
         int settle_input_idx{1};
         for (; in_vert != in_vert_end; ++in_vert) {

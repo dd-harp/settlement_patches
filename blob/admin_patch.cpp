@@ -340,7 +340,7 @@ struct MPDelete {
 vector<ComponentData>
 CreatePatches(
         OGRMultiPolygon* admin, vector<PixelData>& settlement_pfpr,
-        const std::vector<double>& settlement_geo_transform
+        const std::vector<double>& settlement_geo_transform, int population_per_patch
         )
 {
     // Work in projection where units are meters.
@@ -359,7 +359,7 @@ CreatePatches(
     // Should return a graph with an index into settlement_pfpr.
     auto graph = create_neighbor_graph(settlement_pfpr);
     // Cluster on the graph, excluding nodes that are outside the polygon.
-    write_for_metis(graph, settlement_pfpr);
+    auto grouped = split_with_metis(graph, settlement_pfpr, population_per_patch);
 
     auto component_data = properties_of_components(graph, settlement_pfpr);
     for (auto& pixel_data_transform: component_data) {

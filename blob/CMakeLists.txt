@@ -80,7 +80,9 @@ find_library(
 add_executable(blob main.cpp read_tiff.h connected_settlements.h pixel.h simple_patches.h
         shapefile.h gdal_raster.h gdal_raster.cpp gdal_vector.h simple_patches_test.cpp
         gdal_vector.cpp projection.h projection.cpp admin_patch.h admin_patch.cpp
-        on_demand_raster.h on_demand_raster.cpp sparse_settlements.cpp sparse_settlements.h split_patches.h split_patches.cpp)
+        on_demand_raster.h on_demand_raster.cpp sparse_settlements.cpp sparse_settlements.h
+        split_patches.h split_patches.cpp metis_io.cpp metis_io.h
+        )
 add_to_cached_list(CGAL_EXECUTABLE_TARGETS blob )
 
 # Link the executable to CGAL and third-party libraries
@@ -100,7 +102,7 @@ add_executable(blob_test test_main.cpp cgal_tutorial.cpp simple_patches_test.cpp
         projection.h projection.cpp gdal_raster.cpp projection_test.cpp
         on_demand_raster.h on_demand_raster.cpp sparse_settlements.cpp
         sparse_settlements.h split_patches.h split_patches.cpp
-        sparse_settlements_test.cpp gdal_raster_test.cpp)
+        sparse_settlements_test.cpp gdal_raster_test.cpp metis_io.cpp)
 target_link_libraries(
         blob_test
         ${CGAL_LIBRARIES}

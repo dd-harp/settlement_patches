@@ -40,6 +40,8 @@ po::options_description parser(const map<string,fs::path>& path_argument)
             ("test", "run all tests")
             ("tile-subset", po::value<int>(), "how many tiles to use")
             ("population-cutoff", po::value<double>(), "minimum people per pixel")
+            ("population-per-patch", po::value<double>(), "number of people in each patch")
+            ("admin-limit", po::value<int>(), "an upper limit on how many admin units to process")
             ;
     for (auto const& [name, default_path] : path_argument) {
         options.add_options()(name.c_str(), po::value<fs::path>(), name.c_str());
@@ -50,7 +52,7 @@ po::options_description parser(const map<string,fs::path>& path_argument)
 
 /*! Given command line args, assign file paths, using defaults.
  *
- * @param vm Variables initialized from teh command line.
+ * @param vm Variables initialized from the command line.
  * @param input_path A map from a keyword to a default filename for each file type.
  * @return Whether all the input files specified as defaults or on command line do exist.
  */
@@ -118,6 +120,14 @@ int entry(int argc, char* argv[])
     if (vm.count("population-cutoff")) {
         population_cutoff = vm["population-cutoff"].as<double>();
     }
+    double population_per_patch = 500;
+    if (vm.count("population-per-patch")) {
+        population_per_patch = vm["population-per-patch"].as<double>();
+    }
+    int admin_limit{std::numeric_limits<int>::max()};
+    if (vm.count("admin-limit")) {
+        admin_limit = vm["admin-limit"].as<int>();
+    }
     if (vm.count("test")) {
         ::testing::InitGoogleTest(&argc, argv);
         return RUN_ALL_TESTS();
@@ -178,10 +188,9 @@ int entry(int argc, char* argv[])
     vector<ComponentData> components;
     first_admin_layer->ResetReading();
     OGRFeature* geom_feature = first_admin_layer->GetNextFeature();
-    const int feature_cnt{10};
     for (
             int feature_idx=0;
-            (geom_feature != nullptr) && (feature_idx != feature_cnt);
+            (geom_feature != nullptr) && (feature_idx != admin_limit);
             ++feature_idx, geom_feature = first_admin_layer->GetNextFeature()
                     ) {
         cout << "polygon " << poly_idx << endl;
@@ -204,7 +213,9 @@ int entry(int argc, char* argv[])
             vector<PixelData> settlement_pfpr = sparse_settlements(
                     settlement_arr, pfpr_arr, multi_polygon, settlement_geo_transform, population_cutoff
             );
-            auto patch_components = CreatePatches(multi_polygon, settlement_pfpr, settlement_geo_transform);
+            auto patch_components = CreatePatches(
+                    multi_polygon, settlement_pfpr, settlement_geo_transform, population_per_patch
+                    );
             std::copy(patch_components.begin(), patch_components.end(),
                     back_inserter(components)
                     );

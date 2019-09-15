@@ -20,7 +20,9 @@
 #include "admin_patch.h"
 #include "gdal_raster.h"
 #include "component_data.h"
+#include "metis_io.h"
 #include "on_demand_raster.h"
+#include "patch_graph.h"
 #include "projection.h"
 #include "split_patches.h"
 #include "sparse_settlements.h"
@@ -115,13 +117,6 @@ bool cell_in_admin(vector<PixelData>& pixel_data, size_t idx) {
     return relation == Overlap::in || relation == Overlap::on;
 }
 
-struct PatchDescription {
-    size_t index;  // Tells us which settlement this is.
-};
-
-using Graph=boost::adjacency_list<boost::listS, boost::vecS, boost::undirectedS, PatchDescription>;
-using GraphEdge=boost::graph_traits<Graph>::edge_descriptor;
-using GraphVertex=boost::graph_traits<Graph>::vertex_descriptor;
 
 struct centrality_done {
     int _partition_cnt;
@@ -131,7 +126,7 @@ struct centrality_done {
     : _partition_cnt{partition_cnt}, _partition_idx{0}, _maximum_centrality{centrality} {}
     centrality_done(const centrality_done&) = default;
 
-    bool operator()(double maximum_centrality, GraphEdge edge_to_remove, const Graph& graph) {
+    bool operator()(double maximum_centrality, PatchGraphEdge edge_to_remove, const PatchGraph& graph) {
         bool steps_high = (this->_partition_idx >= this->_partition_cnt);
         bool centrality_enough = (maximum_centrality < this->_maximum_centrality);
         this->_partition_idx++;
@@ -145,8 +140,8 @@ struct centrality_done {
 
 template<typename GRAPH>
 size_t component_count(const GRAPH& connection) {
-    map<GraphVertex, size_t> component_map;
-    boost::associative_property_map<map<GraphVertex, size_t>> pcomponent_map{component_map};
+    map<PatchGraphVertex, size_t> component_map;
+    boost::associative_property_map<map<PatchGraphVertex, size_t>> pcomponent_map{component_map};
     boost::connected_components(connection, pcomponent_map);
 
     std::unordered_set<size_t> component_cnt;
@@ -169,7 +164,7 @@ void write_components(const vector<ComponentData>& component_data) {
 }
 
 
-Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
+PatchGraph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
     array<double, 2> bmin{numeric_limits<double>::max(), numeric_limits<double>::max()};
     array<double, 2> bmax{numeric_limits<double>::min(), numeric_limits<double>::min()};
     for (const auto &data_p: settlement_pfpr) {
@@ -254,7 +249,7 @@ Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
         }
     }
     const size_t settlement_in_admin_cnt{settlement_idx_to_graph_idx.size()};
-    Graph connection{
+    PatchGraph connection{
             edges.begin(),
             edges.end(),
             settlement_in_admin_cnt,
@@ -272,7 +267,7 @@ Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
 //    if (settlement_cnt > settle_size) {
 //        size_t component_cnt = component_count(connection);
 //        cout << "graph starts with " << component_cnt << " components" << endl;
-//        using VertexIndex=map<GraphVertex, int>;
+//        using VertexIndex=map<PatchGraphVertex, int>;
 //        VertexIndex vertex_index;
 //        auto[vert_iter, vert_end] = vertices(connection);
 //        for (int vert_idx = 0; vert_iter != vert_end; ++vert_iter, ++vert_idx) {
@@ -280,7 +275,7 @@ Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
 //        }
 //        int split_cnt = 50;
 //        auto doneness = centrality_done{split_cnt, std::pow(settle_size, 2)};
-//        using CentralityMap=map<GraphEdge, double>;
+//        using CentralityMap=map<PatchGraphEdge, double>;
 //        CentralityMap centrality;
 //        boost::associative_property_map<CentralityMap> pcentrality{centrality};
 //        boost::associative_property_map<VertexIndex> pvertex_index{vertex_index};
@@ -292,24 +287,33 @@ Graph create_neighbor_graph(vector<PixelData>& settlement_pfpr) {
 //}
 
 
-vector<ComponentData>
-properties_of_components(Graph& connection, vector<PixelData>& settlement_pfpr)
-{
-    map<GraphVertex, size_t> component_map;
-    boost::associative_property_map<map<GraphVertex, size_t>> pcomponent_map{component_map};
+vector<vector<size_t>>
+connected_connections(PatchGraph& connection) {
+    map<PatchGraphVertex, size_t> component_map;
+    boost::associative_property_map<map<PatchGraphVertex, size_t>> pcomponent_map{component_map};
     boost::connected_components(connection, pcomponent_map);
 
     size_t component_cnt{0};
-    for (const auto& how_many: component_map) {
+    for (const auto &how_many: component_map) {
         component_cnt = std::max(component_cnt, how_many.second + 1);
     }
 
     vector<vector<size_t>> components{component_cnt};
-    for (const auto& settle: component_map) {
+    for (const auto &settle: component_map) {
         components.at(settle.second).push_back(settle.first);
     }
+    return components;
+}
+
+
+vector<ComponentData>
+properties_of_components(
+        const vector<vector<size_t>>& components,
+        vector<PixelData>& settlement_pfpr
+        )
+{
     int component_idx{0};
-    vector<ComponentData> component_data{component_cnt};
+    vector<ComponentData> component_data{components.size()};
     for (const auto& settlements: components) {
         double pfpr{0};
         double pop{0};
@@ -345,7 +349,7 @@ struct MPDelete {
 vector<ComponentData>
 CreatePatches(
         OGRMultiPolygon* admin, vector<PixelData>& settlement_pfpr,
-        const std::vector<double>& settlement_geo_transform
+        const std::vector<double>& settlement_geo_transform, double population_per_patch
         )
 {
     // Work in projection where units are meters.
@@ -364,7 +368,9 @@ CreatePatches(
     // Should return a graph with an index into settlement_pfpr.
     auto graph = create_neighbor_graph(settlement_pfpr);
     // Cluster on the graph, excluding nodes that are outside the polygon.
-    auto component_data = properties_of_components(graph, settlement_pfpr);
+    auto grouped = split_with_metis(graph, settlement_pfpr, population_per_patch);
+
+    auto component_data = properties_of_components(grouped, settlement_pfpr);
     for (auto& pixel_data_transform: component_data) {
         unproject->Transform(1, &pixel_data_transform.centroid_lat_long[0], &pixel_data_transform.centroid_lat_long[1]);
     }
